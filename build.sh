@@ -18,7 +18,7 @@ cd build
 
 echo "*** Building mosquitto ***"
 echo "OpenSSL from: $OPENSSL_DIR"
-cmake .. -DOPENSSL_ROOT_DIR="$OPENSSL_DIR" -DWITH_WEBSOCKETS=ON -DCMAKE_C_FLAGS="-I$PWD/../libwebsockets/build/include" -DCMAKE_EXE_LINKER_FLAGS="-L$PWD/../libwebsockets/build/lib -lwebsockets"
+cmake .. -DOPENSSL_ROOT_DIR="$OPENSSL_DIR" -DWITH_WEBSOCKETS=ON -DOCUMENTATION=OFF -DCMAKE_C_FLAGS="-I$PWD/../libwebsockets/build/include" -DCMAKE_EXE_LINKER_FLAGS="-L$PWD/../libwebsockets/build/lib -lwebsockets"
 make
 cd ..
 

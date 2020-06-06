@@ -6,9 +6,11 @@ and 3.1 of the MQTT protocol. It also includes a C and C++ client library, and
 the `mosquitto_pub` and `mosquitto_sub` utilities for publishing and
 subscribing.
 
+This repo is made with the goal to monitor and visualize connected pub/sub clients for the ARENA.
+
 ## Building
 
-If you are using a Mac, run ./setup.sh and then run ./build.sh to build binaries.
+If you are using a Mac, run ```./setup.sh``` and then run ```./build.sh``` to build binaries with websockets support.
 Server and client executables will be found in the bin/ directory.
 
 ## Links
@@ -41,28 +43,6 @@ And to publish a message:
 
     mosquitto_pub -t 'test/topic' -m 'hello world'
 
-## Documentation
-
-Documentation for the broker, clients and client library API can be found in
-the man pages, which are available online at <https://mosquitto.org/man/>. There
-are also pages with an introduction to the features of MQTT, the
-`mosquitto_passwd` utility for dealing with username/passwords, and a
-description of the configuration file options available for the broker.
-
-Detailed client library API documentation can be found at <https://mosquitto.org/api/>
-
-## Building from source
-
-To build from source the recommended route for end users is to download the
-archive from <https://mosquitto.org/download/>.
-
-On Windows and Mac, use `cmake` to build. On other platforms, just run `make`
-to build. For Windows, see also `readme-windows.txt`.
-
-If you are building from the git repository then the documentation will not
-already be built. Use `make binary` to skip building the man pages, or install
-`docbook-xsl` on Debian/Ubuntu systems.
-
 ### Build Dependencies
 
 * c-ares (libc-ares-dev on Debian based systems) - only when compiled with `make WITH_SRV=yes`
@@ -72,7 +52,6 @@ already be built. Use `make binary` to skip building the man pages, or install
 * uthash / utlist - bundled versions of these headers are provided, disable their use with `make WITH_BUNDLED_DEPS=no`
 
 Equivalent options for enabling/disabling features are available when using the CMake build.
-
 
 ## Credits
 
