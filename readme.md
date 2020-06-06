@@ -6,6 +6,11 @@ and 3.1 of the MQTT protocol. It also includes a C and C++ client library, and
 the `mosquitto_pub` and `mosquitto_sub` utilities for publishing and
 subscribing.
 
+## Building
+
+If you are using a Mac, run ./setup.sh and then run ./build.sh to build binaries.
+Server and client executables will be found in the bin/ directory.
+
 ## Links
 
 See the following links for more information on MQTT:
@@ -22,15 +27,9 @@ Mosquitto project information is available at the following locations:
 
 There is also a public test server available at <https://test.mosquitto.org/>
 
-## Installing
-
-See <https://mosquitto.org/download/> for details on installing binaries for
-various platforms.
-
 ## Quick start
 
-If you have installed a binary package the broker should have been started
-automatically. If not, it can be started with a basic configuration:
+Server can be started with a basic configuration:
 
     mosquitto
 
