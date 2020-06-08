@@ -1,6 +1,6 @@
 .PHONY: all test clean reallyclean
 
-CFLAGS=-I../../../lib -I../../../src -Wall -Werror
+CFLAGS=-I../../../lib -I../../../src -Wall -Werror -undefined dynamic_lookup
 
 PLUGIN_SRC = \
 	auth_plugin.c \
@@ -16,9 +16,9 @@ PLUGIN_SRC = \
 
 PLUGINS = ${PLUGIN_SRC:.c=.so}
 
-SRC = \
-	08-tls-psk-pub.c \
-	08-tls-psk-bridge.c
+# SRC = \
+# 	08-tls-psk-pub.c \
+# 	08-tls-psk-bridge.c
 
 TESTS = ${SRC:.c=.test}
 
@@ -29,8 +29,8 @@ ${PLUGINS} : %.so: %.c
 	$(CC) ${CFLAGS} -fPIC -shared $< -o $@
 
 
-${TESTS} : %.test: %.c
-	$(CC) ${CFLAGS} $< -o $@ ../../../lib/libmosquitto.so.1
+# ${TESTS} : %.test: %.c
+# 	$(CC) ${CFLAGS} $< -o $@ ../../../lib/libmosquitto.so.1
 
 
 reallyclean : clean

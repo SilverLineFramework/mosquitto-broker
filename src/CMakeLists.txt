@@ -55,6 +55,9 @@ set (MOSQ_SRCS
 	session_expiry.c
 	subs.c
 	sys_tree.c sys_tree.h
+	network_graph.c network_graph.h
+	cJSON.c cJSON.h
+	cJSON_Utils.c cJSON_Utils.h
 	../lib/time_mosq.c
 	../lib/tls_mosq.c
 	../lib/util_mosq.c ../lib/util_topic.c ../lib/util_mosq.h
