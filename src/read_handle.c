@@ -20,7 +20,7 @@ Contributors:
 #include <stdio.h>
 #include <string.h>
 
-#include <cJSON.h>
+#include <../cJSON/cJSON.h>
 
 #include "mosquitto_broker_internal.h"
 #include "mqtt_protocol.h"
