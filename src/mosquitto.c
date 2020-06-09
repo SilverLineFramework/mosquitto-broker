@@ -4,12 +4,12 @@ Copyright (c) 2009-2020 Roger Light <roger@atchoo.org>
 All rights reserved. This program and the accompanying materials
 are made available under the terms of the Eclipse Public License v1.0
 and Eclipse Distribution License v1.0 which accompany this distribution.
- 
+
 The Eclipse Public License is available at
    http://www.eclipse.org/legal/epl-v10.html
 and the Eclipse Distribution License is available at
   http://www.eclipse.org/org/documents/edl-v10.php.
- 
+
 Contributors:
    Roger Light - initial implementation and documentation.
 */
@@ -53,6 +53,7 @@ Contributors:
 #include "memory_mosq.h"
 #include "misc_mosq.h"
 #include "util_mosq.h"
+#include "network_graph.h"
 
 struct mosquitto_db int_db;
 
@@ -288,6 +289,8 @@ int main(int argc, char *argv[])
 	if(rc) return rc;
 	rc = mosquitto_security_init(&int_db, false);
 	if(rc) return rc;
+	rc = network_graph_init();
+	if(rc) return rc;
 
 #ifdef WITH_SYS_TREE
 	sys_tree__init(&int_db);
@@ -358,7 +361,7 @@ int main(int argc, char *argv[])
 #ifdef WITH_BRIDGE
 	for(i=0; i<config.bridge_count; i++){
 		if(bridge__new(&int_db, &(config.bridges[i]))){
-			log__printf(NULL, MOSQ_LOG_WARNING, "Warning: Unable to connect to bridge %s.", 
+			log__printf(NULL, MOSQ_LOG_WARNING, "Warning: Unable to connect to bridge %s.",
 					config.bridges[i].name);
 		}
 	}

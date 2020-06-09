@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 OPENSSL_DIR=$(find /usr/local/Cellar/openssl -name '1.*')
 

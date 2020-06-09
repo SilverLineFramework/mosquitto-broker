@@ -49,7 +49,7 @@ time.sleep(1)
 client1.subscribe("hi/test")
 time.sleep(1)
 
-client1.subscribe("$SYS/hello")
+client1.subscribe("$SYS/graph")
 time.sleep(1)
 
 client1.disconnect()

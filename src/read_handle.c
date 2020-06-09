@@ -20,8 +20,6 @@ Contributors:
 #include <stdio.h>
 #include <string.h>
 
-#include <../cJSON/cJSON.h>
-
 #include "mosquitto_broker_internal.h"
 #include "mqtt_protocol.h"
 #include "memory_mosq.h"
@@ -31,8 +29,6 @@ Contributors:
 #include "sys_tree.h"
 #include "util_mosq.h"
 #include "network_graph.h"
-
-int i = 0;
 
 int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 {
@@ -63,6 +59,8 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 			break;
 		case CMD_CONNECT:
 			rc = handle__connect(db, context);
+			if (rc != MOSQ_ERR_PROTOCOL)
+				network_graph_add_node(db, context);
 			break;
 		case CMD_DISCONNECT:
 			rc = handle__disconnect(db, context);
@@ -89,44 +87,12 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 			break;
 		default:
 			/* If we don't recognize the command, return an error straight away. */
-			return MOSQ_ERR_PROTOCOL;
+			rc = MOSQ_ERR_PROTOCOL;
+			break;
 	}
 
-	++i;
-	log__printf(NULL, MOSQ_LOG_NOTICE, "ip addr -> %s", context->address);
-	log__printf(NULL, MOSQ_LOG_NOTICE, "client id -> %s", context->id);
-	if (context->sub_count > 0) {
-		for (int j = 0; j < context->sub_count; j++)
-			log__printf(NULL, MOSQ_LOG_NOTICE, "topic -> %s", context->subs[j]->topic);
-	}
-	log__printf(NULL, MOSQ_LOG_NOTICE, "remaining len -> %d", context->in_packet.remaining_length);
-
-	cJSON *root, *data1, *data2, *conn, *_data1, *_data2, *_conn;
-
-    root = cJSON_CreateArray();
-    data1 = cJSON_CreateObject();
-    data2 = cJSON_CreateObject();
-    conn = cJSON_CreateObject();
-    _data1 = cJSON_CreateObject();
-    _data2 = cJSON_CreateObject();
-    _conn = cJSON_CreateObject();
-
-    cJSON_AddItemToObject(data1, "data", _data1);
-    cJSON_AddItemToObject(_data1, "id", cJSON_CreateString("a"));
-    cJSON_AddItemToObject(data2, "data", _data2);
-    cJSON_AddItemToObject(_data2, "id", cJSON_CreateString("b"));
-    cJSON_AddItemToObject(conn, "data", _conn);
-    cJSON_AddItemToObject(_conn, "id", cJSON_CreateString("ab"));
-    cJSON_AddItemToObject(_conn, "source", cJSON_CreateString("a"));
-    cJSON_AddItemToObject(_conn, "target", cJSON_CreateString("b"));
-
-    cJSON_AddItemToArray(root, data1);
-    cJSON_AddItemToArray(root, data2);
-    cJSON_AddItemToArray(root, conn);
-
-    char *out = cJSON_Print(root);
-
-	db__messages_easy_queue(db, NULL, "$SYS/hello", 1, strlen(out), out, 1, 60, NULL);
+	// if (rc != MOSQ_ERR_PROTOCOL)
+	// 	add_node(db, context);
 
 	return rc;
 }
