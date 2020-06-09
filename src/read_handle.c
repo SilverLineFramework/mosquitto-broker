@@ -67,6 +67,8 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 			break;
 		case CMD_SUBSCRIBE:
 			rc = handle__subscribe(db, context);
+			if (rc != MOSQ_ERR_PROTOCOL)
+				network_graph_add_subtopic(db, context);
 			break;
 		case CMD_UNSUBSCRIBE:
 			rc = handle__unsubscribe(db, context);

@@ -5,5 +5,6 @@
 
 int network_graph_init();
 int network_graph_add_node(struct mosquitto_db *db, struct mosquitto *context);
+int network_graph_add_subtopic(struct mosquitto_db *db, struct mosquitto *context);
 
 #endif
