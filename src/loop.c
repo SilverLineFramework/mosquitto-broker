@@ -4,12 +4,12 @@ Copyright (c) 2009-2020 Roger Light <roger@atchoo.org>
 All rights reserved. This program and the accompanying materials
 are made available under the terms of the Eclipse Public License v1.0
 and Eclipse Distribution License v1.0 which accompany this distribution.
- 
+
 The Eclipse Public License is available at
    http://www.eclipse.org/legal/epl-v10.html
 and the Eclipse Distribution License is available at
   http://www.eclipse.org/org/documents/edl-v10.php.
- 
+
 Contributors:
    Roger Light - initial implementation and documentation.
    Tatsuzo Osawa - Add epoll.
@@ -55,6 +55,7 @@ Contributors:
 #include "sys_tree.h"
 #include "time_mosq.h"
 #include "util_mosq.h"
+#include "network_graph.h"
 
 extern bool flag_reload;
 #ifdef WITH_PERSISTENCE
@@ -642,7 +643,7 @@ void do_disconnect(struct mosquitto_db *db, struct mosquitto *context, int reaso
 			if (epoll_ctl(db->epollfd, EPOLL_CTL_DEL, context->sock, &ev) == -1) {
 				log__printf(NULL, MOSQ_LOG_DEBUG, "Error in epoll disconnecting websockets: %s", strerror(errno));
 			}
-#endif		
+#endif
 			context->sock = INVALID_SOCKET;
 			context->pollfd_index = -1;
 		}
@@ -661,6 +662,7 @@ void do_disconnect(struct mosquitto_db *db, struct mosquitto *context, int reaso
 		if(db->config->connection_messages == true){
 			if(context->id){
 				id = context->id;
+				network_graph_delete_node(context);
 			}else{
 				id = "<unknown>";
 			}
@@ -694,7 +696,7 @@ void do_disconnect(struct mosquitto_db *db, struct mosquitto *context, int reaso
 				log__printf(NULL, MOSQ_LOG_DEBUG, "Error in epoll disconnecting: %s", strerror(errno));
 			}
 		}
-#endif		
+#endif
 		context__disconnect(db, context);
 	}
 }
@@ -763,7 +765,7 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 #else
 #ifdef WITH_EPOLL
 		if(events & EPOLLOUT){
-#else			
+#else
 		if(pollfds[context->pollfd_index].revents & POLLOUT){
 #endif
 #endif

@@ -54,6 +54,8 @@ time.sleep(0.1)
 client1.subscribe("$SYS/graph")
 time.sleep(0.1)
 
+time.sleep(10)
+
 client1.disconnect()
 client2.disconnect()
 

@@ -60,15 +60,17 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 		case CMD_CONNECT:
 			rc = handle__connect(db, context);
 			if (rc != MOSQ_ERR_PROTOCOL)
-				network_graph_add_node(db, context);
+				network_graph_add_node(context);
 			break;
 		case CMD_DISCONNECT:
 			rc = handle__disconnect(db, context);
+			// if (rc != MOSQ_ERR_PROTOCOL)
+			// 	network_graph_delete_node(db, context);
 			break;
 		case CMD_SUBSCRIBE:
 			rc = handle__subscribe(db, context);
 			if (rc != MOSQ_ERR_PROTOCOL)
-				network_graph_add_subtopic(db, context);
+				network_graph_add_subtopic(context);
 			break;
 		case CMD_UNSUBSCRIBE:
 			rc = handle__unsubscribe(db, context);
@@ -93,8 +95,8 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 			break;
 	}
 
-	// if (rc != MOSQ_ERR_PROTOCOL)
-	// 	add_node(db, context);
+	if (rc != MOSQ_ERR_PROTOCOL)
+		graph_pub(db);
 
 	return rc;
 }
