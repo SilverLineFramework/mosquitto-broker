@@ -33,28 +33,38 @@ print "connecting to broker", broker, "on port", port
 client1.connect(broker, port)
 client1.loop_start()
 
-time.sleep(0.1)
+time.sleep(3)
 
 print "connecting to broker", broker, "on port", port
 client2.connect(broker, port)
 client2.loop_start()
 
-client1.subscribe("demo_topic_js")
-time.sleep(0.1)
+client1.subscribe("demo_topic_js", 1)
+time.sleep(3)
 
-client1.publish("test/publish/py", "on",  retain=False)
-time.sleep(0.1)
+client1.publish("test/publish/py", "on", retain=False)
+time.sleep(3)
 
-client1.subscribe("hi/test1")
-time.sleep(0.1)
+client1.subscribe("hi/test1", 1)
+time.sleep(3)
 
 client2.subscribe("hi/test2")
-time.sleep(0.1)
+time.sleep(3)
 
 client1.subscribe("$SYS/graph")
-time.sleep(0.1)
+time.sleep(3)
 
-time.sleep(10)
+client2.subscribe("test/publish/py")
+time.sleep(3)
+
+client1.publish("test1/publish/js", "on", retain=False)
+time.sleep(3)
+
+client2.subscribe("test1/#")
+time.sleep(3)
+
+client1.unsubscribe("hi/test1")
+time.sleep(3)
 
 client1.disconnect()
 client2.disconnect()

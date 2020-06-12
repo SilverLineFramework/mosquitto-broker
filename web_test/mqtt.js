@@ -1,90 +1,39 @@
 let cy;
-
 window.onload = function () {
   cy = window.cy = cytoscape({
     container: document.getElementById('cy'),
-
     boxSelectionEnabled: false,
-    autounselectify: true,
-
-    layout: {
-      name: 'concentric',
-      concentric: function(n){ return n.id() === 'j' ? 200 : 0; },
-      levelWidth: function(nodes){ return 100; },
-      minNodeSpacing: 100
-    },
-
     style: [
       {
-        selector: 'node[name]',
-        style: {
-          'content': 'data(name)'
+        selector: 'node',
+        css: {
+          'content': 'data(id)',
+          'text-valign': 'center',
+          'text-halign': 'center',
+          'padding': '10px',
+          'shape': 'round-rectangle'
         }
       },
-
+      {
+        selector: ':parent',
+        css: {
+          'text-valign': 'top',
+          'text-halign': 'center',
+          'padding': '25px'
+        }
+      },
       {
         selector: 'edge',
-        style: {
+        css: {
           'curve-style': 'bezier',
           'target-arrow-shape': 'triangle'
         }
-      },
-
-      // some style for the extension
-
-      {
-        selector: '.eh-handle',
-        style: {
-          'background-color': 'red',
-          'width': 12,
-          'height': 12,
-          'shape': 'ellipse',
-          'overlay-opacity': 0,
-          'border-width': 12, // makes the handle easier to hit
-          'border-opacity': 0
-        }
-      },
-
-      {
-        selector: '.eh-hover',
-        style: {
-          'background-color': 'red'
-        }
-      },
-
-      {
-        selector: '.eh-source',
-        style: {
-          'border-width': 2,
-          'border-color': 'red'
-        }
-      },
-
-      {
-        selector: '.eh-target',
-        style: {
-          'border-width': 2,
-          'border-color': 'red'
-        }
-      },
-
-      {
-        selector: '.eh-preview, .eh-ghost-edge',
-        style: {
-          'background-color': 'red',
-          'line-color': 'red',
-          'target-arrow-color': 'red',
-          'source-arrow-color': 'red'
-        }
-      },
-
-      {
-        selector: '.eh-ghost-edge.eh-preview-active',
-        style: {
-          'opacity': 0
-        }
       }
     ],
+    layout: {
+      name: 'preset',
+      padding: 5
+    },
     elements: []
   });
 }
@@ -121,11 +70,15 @@ function onConnectionLost(responseObject) {
 // }
 
 function onMessageArrived(message) {
-  // let el = document.createElement('div')
-  // el.innerHTML = message.payloadString
-  // document.body.appendChild(el)
-  // console.log(message.payloadString)
-  var newJSON = JSON.parse(message.payloadString)
-  console.log(newJSON);
-  cy.json({ elements: newJSON })
+  var newJSON = JSON.parse(message.payloadString);
+
+  for (var i = 0; i < newJSON.length; i++) {
+    var elem = cy.getElementById(newJSON[i]["data"]["id"]);
+    newJSON[i]["position"] = elem.position();
+  }
+
+  console.log(message.payloadString);
+
+  cy.json({ elements: newJSON });
+
 }
