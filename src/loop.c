@@ -663,6 +663,7 @@ void do_disconnect(struct mosquitto_db *db, struct mosquitto *context, int reaso
 			if(context->id){
 				id = context->id;
 				network_graph_delete_client(context);
+				network_graph_pub(db);
 			}else{
 				id = "<unknown>";
 			}
@@ -689,7 +690,6 @@ void do_disconnect(struct mosquitto_db *db, struct mosquitto *context, int reaso
 			}else{
 				log__printf(NULL, MOSQ_LOG_NOTICE, "Client %s disconnected.", id);
 			}
-			network_graph_pub(db);
 		}
 #ifdef WITH_EPOLL
 		if (context->sock != INVALID_SOCKET && epoll_ctl(db->epollfd, EPOLL_CTL_DEL, context->sock, &ev) == -1) {

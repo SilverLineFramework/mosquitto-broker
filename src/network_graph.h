@@ -5,12 +5,17 @@
 
 #include "mosquitto.h"
 
+typedef enum {
+    PUB, SUB
+} edge_type_t;
+
 struct topic_name {
     struct topic_name *next;
     unsigned long hash_id;
 };
 
 struct edge {
+    edge_type_t type;
     cJSON *json;
     struct edge *next;
     unsigned long hash_id;
@@ -53,9 +58,9 @@ struct network_graph {
 
 int network_graph_init();
 int network_graph_add_client(struct mosquitto *context);
-int network_graph_delete_client(struct mosquitto *context);
 int network_graph_add_subtopic(struct mosquitto *context, const char *topic);
 int network_graph_add_pubtopic(struct mosquitto *context, const char *topic);
+int network_graph_delete_client(struct mosquitto *context);
 int network_graph_delete_subtopic(struct mosquitto *context, const char *topic);
 int network_graph_pub(struct mosquitto_db *db);
 

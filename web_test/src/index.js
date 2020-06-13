@@ -21,21 +21,21 @@ window.onload = function () {
         }, {
             selector: 'node[class="client"]',
             style: {
-                "font-size": 2,
+                "font-size": 6,
                 'shape': 'round-rectangle',
                 'background-color': 'LightGray'
             }
         }, {
             selector: 'node[class="topic"]',
             style: {
-                "font-size": 2,
+                "font-size": 6,
                 'shape': 'ellipse',
                 'background-color': 'LightBlue'
             }
         }, {
             selector: 'node[class="client ip"]',
             style: {
-                "font-size": 3,
+                "font-size": 6,
                 'shape': 'barrel',
                 'background-color': 'Coral'
             }
@@ -47,14 +47,14 @@ window.onload = function () {
             }
         }, {
             selector: 'edge',
-            css: {
-                'curve-style': 'bezier',
-                'target-arrow-shape': 'triangle'
-            },
+            css: { },
             style: {
-                "font-size": 2,
                 'label': 'data(label)',
-                'background-color': 'Black'
+                "font-size": 3,
+                'width': 1,
+                'curve-style': 'bezier',
+                'target-arrow-shape': 'triangle-cross',
+                'arrow-scale': 0.5
             }
         }],
         elements: []
@@ -96,19 +96,21 @@ function onConnectionLost(responseObject) {
 function runLayout() {
     cy.layout({
         name: 'cose-bilkent',
+        padding: 100,
+        nodeRepulsion: 5000,
         animationDuration: 100
     }).run();
 }
 
 function onMessageArrived(message) {
+    console.log(message.payloadString);
+
     var newJSON = JSON.parse(message.payloadString);
 
     for (var i = 0; i < newJSON.length; i++) {
         var elem = cy.getElementById(newJSON[i]["data"]["id"]);
         newJSON[i]["position"] = elem.position();
     }
-
-    console.log(message.payloadString);
 
     cy.json({ elements: newJSON });
 

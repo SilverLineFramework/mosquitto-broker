@@ -17,7 +17,6 @@ const char s[2] = "/";
 
 struct network_graph *graph = NULL;
 
-
 static unsigned long sdbm_hash(const char *str) {
     unsigned long hash = -1, c;
     while((c = *str++)) {
@@ -47,22 +46,35 @@ static cJSON *create_container_json(const char *address) {
     return root;
 }
 
-static cJSON *create_edge_json(const char *node_id1, const char *node_id2) {
+static cJSON *create_edge_json(const char *node_id1, const char *node_id2, edge_type_t type) {
     cJSON *root, *data;
     char buf[MAX_TOPIC_LEN];
 
     root = cJSON_CreateObject();
     data = cJSON_CreateObject();
 
-    strcpy(buf, node_id1);
-    strcat(buf, "-");
-    strcat(buf, node_id2);
+    if (type == PUB) {
+        strcpy(buf, node_id1);
+        strcat(buf, "-");
+        strcat(buf, node_id2);
+    }
+    else if (type == SUB) {
+        strcpy(buf, node_id2);
+        strcat(buf, "-");
+        strcat(buf, node_id1);
+    }
 
     cJSON_AddItemToObject(data, "id", cJSON_CreateString(buf));
-    cJSON_AddItemToObject(data, "class", cJSON_CreateString("edges"));
+    cJSON_AddItemToObject(data, "class", cJSON_CreateString("connections"));
     cJSON_AddItemToObject(data, "label", cJSON_CreateString(buf));
-    cJSON_AddItemToObject(data, "source", cJSON_CreateString(node_id1));
-    cJSON_AddItemToObject(data, "target", cJSON_CreateString(node_id2));
+    if (type == PUB) {
+        cJSON_AddItemToObject(data, "source", cJSON_CreateString(node_id1));
+        cJSON_AddItemToObject(data, "target", cJSON_CreateString(node_id2));
+    }
+    else if (type == SUB) {
+        cJSON_AddItemToObject(data, "source", cJSON_CreateString(node_id2));
+        cJSON_AddItemToObject(data, "target", cJSON_CreateString(node_id1));
+    }
 
     cJSON_AddItemToObject(root, "data", data);
     cJSON_AddItemToObject(root, "group", cJSON_CreateString("edges"));
@@ -100,7 +112,7 @@ static cJSON *create_topic_json(const char *id) {
 
     cJSON_SetValuestring(data_id, id);
     cJSON_SetValuestring(data_label, id);
-    cJSON_SetValuestring(data_class, "simple chemical");
+    cJSON_SetValuestring(data_class, "topic");
 
     return topic;
 }
@@ -162,11 +174,12 @@ static struct topic_vertex *create_topic_vertex(const char *id) {
     return item;
 }
 
-static struct edge *create_edge(const char *source, const char *target) {
+static struct edge *create_edge(const char *source, const char *target, edge_type_t type) {
     struct edge *item = mosquitto__malloc(sizeof(struct edge));
     item->hash_id = sdbm_hash(target);
     item->next = NULL;
-    item->json = create_edge_json(source, target);
+    item->json = create_edge_json(source, target, type);
+    item->type = type;
     return item;
 }
 
@@ -250,8 +263,8 @@ static struct topic_vertex *graph_add_topic_vertex(const char *id) {
     return to_add;
 }
 
-static struct edge *graph_add_edge_at_vert(struct client_vertex *vertex, const char *source, const char *target) {
-    struct edge *to_add = create_edge(source, target);
+static struct edge *graph_add_edge_at_vert(struct client_vertex *vertex, const char *source, const char *target, edge_type_t type) {
+    struct edge *to_add = create_edge(source, target, type);
 
     if (vertex->edge_list == NULL && vertex->edge_tail == NULL) {
         vertex->edge_list = to_add;
@@ -265,17 +278,17 @@ static struct edge *graph_add_edge_at_vert(struct client_vertex *vertex, const c
     return to_add;
 }
 
-static struct edge *graph_add_edge(const char *source, const char *target) {
+static struct edge *graph_add_edge(const char *source, const char *target, edge_type_t type) {
     struct client_vertex *vertex = find_client_vertex_with_id(source);
     if (vertex == NULL) return NULL;
-    struct edge *to_add = graph_add_edge_at_vert(vertex, source, target);
+    struct edge *to_add = graph_add_edge_at_vert(vertex, source, target, type);
     return to_add;
 }
 
-static int graph_add_edges_to_topic(struct mosquitto *context, const char *topic) {
-    if (topic[0] == '$') {
-        return 0;
-    }
+static int graph_add_edges_to_topic(const char *source, const char *topic) {
+    // if (topic[0] == '$') {
+    //     return 0;
+    // }
 
     char _topic[MAX_TOPIC_LEN], *tmp;
     struct topic_vertex *curr = graph->topic_start;
@@ -286,7 +299,7 @@ static int graph_add_edges_to_topic(struct mosquitto *context, const char *topic
             curr_topic = curr->topic;
             if (strcmp(curr->full_topic, topic) == 0) {
                 // log__printf(NULL, MOSQ_LOG_NOTICE, "exact match: %s %s", curr->full_topic, topic);
-                graph_add_edge(context->id, curr->full_topic);
+                graph_add_edge(source, curr->full_topic, SUB);
                 continue;
             }
 
@@ -295,7 +308,7 @@ static int graph_add_edges_to_topic(struct mosquitto *context, const char *topic
             while(tmp != NULL && curr_topic != NULL) {
                 if (tmp[0] == '#') {
                     // log__printf(NULL, MOSQ_LOG_NOTICE, "wildcard match: %s %s", topic, curr->full_topic);
-                    graph_add_edge(context->id, curr->full_topic);
+                    graph_add_edge(source, curr->full_topic, SUB);
                     break;
                 }
                 else if (sdbm_hash(tmp) == curr_topic->hash_id || tmp[0] == '+') {
@@ -384,6 +397,37 @@ static int graph_delete_topic_vertex_with_hash(unsigned long hash) {
     return -1;
 }
 
+static int graph_delete_client_vertex(struct client_vertex *prev, struct client_vertex *vert) {
+    if (vert->parent->ref_cnt == 0)
+        graph_delete_ip_vertex_with_hash(vert->parent->hash_id);
+
+    if (graph->client_start == vert && graph->client_end == vert) {
+        graph->client_start = NULL;
+        graph->client_end = NULL;
+    }
+    else if (graph->client_start == vert) {
+        graph->client_start = graph->client_start->next;
+    }
+    else if (graph->client_end == vert) {
+        graph->client_end = prev;
+        graph->client_end->next = NULL;
+    }
+    else {
+        prev->next = vert->next;
+    }
+
+    struct edge *temp;
+    while (vert->edge_list != NULL) {
+        temp = vert->edge_list;
+        vert->edge_list = vert->edge_list->next;
+        graph_delete_topic_vertex_with_hash(temp->hash_id);
+        mosquitto__free(temp);
+    }
+    // cJSON_Delete(curr->json);
+    // mosquitto__free(curr);
+    return 0;
+}
+
 static int graph_delete_client_vertex_with_hash(unsigned long hash) {
     struct client_vertex *curr = graph->client_start, *prev = curr;
     struct topic_name *curr_topic;
@@ -391,36 +435,7 @@ static int graph_delete_client_vertex_with_hash(unsigned long hash) {
     for (; curr != NULL; curr=curr->next) {
         if (hash == curr->hash_id) {
             curr->parent->ref_cnt--;
-            if (curr->parent->ref_cnt == 0)
-                graph_delete_ip_vertex_with_hash(curr->parent->hash_id);
-
-            if (graph->client_start == curr && graph->client_end == curr) {
-                graph->client_start = NULL;
-                graph->client_end = NULL;
-            }
-            else if (graph->client_start == curr) {
-                graph->client_start = graph->client_start->next;
-            }
-            else if (graph->client_end == curr) {
-                graph->client_end = prev;
-                graph->client_end->next = NULL;
-            }
-            else {
-                prev->next = curr->next;
-            }
-
-            struct edge *temp;
-            while (curr->edge_list != NULL) {
-                temp = curr->edge_list;
-                curr->edge_list = curr->edge_list->next;
-                if (graph_delete_topic_vertex_with_hash(temp->hash_id) < 0) {
-                    log__printf(NULL, MOSQ_LOG_NOTICE, "error deleting topic vertex");
-                }
-                mosquitto__free(temp);
-            }
-            // cJSON_Delete(curr->json);
-            // mosquitto__free(curr);
-            return 0;
+            graph_delete_client_vertex(prev, curr);
         }
         prev = curr;
     }
@@ -495,19 +510,8 @@ int network_graph_add_client(struct mosquitto *context) {
     return -1;
 }
 
-int network_graph_delete_client(struct mosquitto *context) {
-    if (graph_delete_client_vertex_with_hash(sdbm_hash(context->id)) != 0) {
-        log__printf(NULL, MOSQ_LOG_NOTICE, "error deleting client vertex");
-    }
-    // struct topic_vertex *curr = graph->topic_start;
-    // for (; curr != NULL; curr=curr->next) {
-    //     log__printf(NULL, MOSQ_LOG_NOTICE, "%p", curr);
-    // }
-    return 0;
-}
-
 int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
-    if (graph_add_edges_to_topic(context, topic) != 0) {
+    if (graph_add_edges_to_topic(context->id, topic) != 0) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "error adding edges to topic");
     }
     return 0;
@@ -521,9 +525,16 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic) {
     top->ref_cnt++;
 
     if (find_edge(context->id, topic) == NULL) {
-        graph_add_edge(context->id, topic);
+        graph_add_edge(context->id, topic, PUB);
     }
 
+    return 0;
+}
+
+int network_graph_delete_client(struct mosquitto *context) {
+    if (graph_delete_client_vertex_with_hash(sdbm_hash(context->id)) < 0) {
+        log__printf(NULL, MOSQ_LOG_NOTICE, "error deleting client vertex");
+    }
     return 0;
 }
 
@@ -531,7 +542,9 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
     if (graph_delete_edge(context->id, topic) != 0) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "unsub failed");
     }
-    // log__printf(NULL, MOSQ_LOG_NOTICE, "unsub %s %s", context->id, topic);
+    // else {
+    //     log__printf(NULL, MOSQ_LOG_NOTICE, "unsub %s %s", context->id, topic);
+    // }
     return 0;
 }
 
@@ -560,7 +573,6 @@ int network_graph_pub(struct mosquitto_db *db) {
     for (; top != NULL; top=top->next) {
         cJSON_AddItemToArray(root, top->json);
     }
-    log__printf(NULL, MOSQ_LOG_NOTICE, "here: %p", graph->topic_start);
 
     json_buf = cJSON_Print(root);
     db__messages_easy_queue(db, NULL, "$SYS/graph", 1, strlen(json_buf), json_buf, 1, 10, NULL);
