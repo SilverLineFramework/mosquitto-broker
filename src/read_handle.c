@@ -93,6 +93,9 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 
 	if (rc != MOSQ_ERR_PROTOCOL)
 		network_graph_pub(db);
+	else
+		log__printf(NULL, MOSQ_LOG_NOTICE, "protocol error!");
+
 
 	return rc;
 }

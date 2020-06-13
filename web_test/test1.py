@@ -7,19 +7,25 @@ def rand_str(N):
 broker = "127.0.0.1"
 port = 9001
 
-client1 = mqtt.Client("client_py_"+rand_str(5), clean_session=True, userdata=None, transport="websockets")
-client2 = mqtt.Client("client_py_"+rand_str(5), clean_session=True, userdata=None, transport="websockets")
-client3 = mqtt.Client("client_py_"+rand_str(5), clean_session=True, userdata=None, transport="websockets")
+client1 = mqtt.Client("client_py_"+rand_str(5), clean_session=True, transport="websockets")
+client2 = mqtt.Client("client_py_"+rand_str(5), clean_session=True)
+client3 = mqtt.Client("client_py_"+rand_str(5), clean_session=True)
 
 clients = [client1, client2, client3]
-for client in clients:
-    client.connect(broker, port)
-    client.loop_start()
+
+client1.connect(broker, port)
+client1.loop_start()
+
+client2.connect(broker, 1883)
+client2.loop_start()
+
+client3.connect(broker, 1883)
+client3.loop_start()
 
 start_topic = "begin/start"
 
 client3.publish(start_topic, rand_str(random.randint(10,50)), retain=False)
-client.subscribe(start_topic, 1)
+client3.subscribe(start_topic, 1)
 
 pub_topics = [start_topic]
 sub_topics = [start_topic]
@@ -39,17 +45,17 @@ while False == False:
 
         client.publish(topic, rand_str(random.randint(10,50)), retain=False)
 
-    elif num <= 75:
+    elif num <= 65 and len(sub_topics):
+        topic = random.choice(sub_topics)
+        print "unsubbed to", topic
+        client.unsubscribe(topic)
+        sub_topics.remove(topic)
+
+    elif num <= 100 > 0:
         qos = random.randint(0,2)
         topic = random.choice(pub_topics)
         print "subbed to", topic
         client.subscribe(topic, qos)
         sub_topics += [topic]
-
-    elif num <= 100 and sub_topics != []:
-        topic = random.choice(sub_topics)
-        print "unsubbed to", topic
-        client.unsubscribe(topic)
-        sub_topics.remove(topic)
 
     time.sleep(2)

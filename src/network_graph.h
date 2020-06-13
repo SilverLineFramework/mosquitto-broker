@@ -5,43 +5,50 @@
 
 #include "mosquitto.h"
 
-#define MAX_TOPIC_LEN 32767
-
-typedef enum {
-    CLIENT_TOPIC, TOPIC_TOPIC
-} edge_type_t;
-
-typedef enum {
-    IP_CONTAINER, CLIENT, TOPIC
-} vertex_type_t;
-
 struct topic_name {
     struct topic_name *next;
     unsigned long hash_id;
 };
 
 struct edge {
-    edge_type_t type;
     cJSON *json;
     struct edge *next;
     unsigned long hash_id;
 };
 
-struct vertex {
-    vertex_type_t type;
+struct ip_vertex {
     cJSON *json;
+    struct ip_vertex *next;
+    unsigned long hash_id;
+    unsigned long ref_cnt;
+};
+
+struct client_vertex {
+    cJSON *json;
+    struct client_vertex *next;
     struct edge *edge_list;
     struct edge *edge_tail;
+    struct ip_vertex *parent;
+    unsigned long hash_id;
+};
+
+struct topic_vertex {
+    cJSON *json;
+    struct topic_vertex *next;
+    char *full_topic;
     struct topic_name *topic;
     struct topic_name *topic_tail;
     unsigned long hash_id;
-    char full_topic[MAX_TOPIC_LEN];
+    unsigned long ref_cnt;
 };
 
 struct network_graph {
-    unsigned long length;
-    unsigned long max_length;
-    struct vertex **vertices;
+    struct ip_vertex *ip_start;
+    struct ip_vertex *ip_end;
+    struct client_vertex *client_start;
+    struct client_vertex *client_end;
+    struct topic_vertex *topic_start;
+    struct topic_vertex *topic_end;
 };
 
 int network_graph_init();
