@@ -49,7 +49,7 @@ window.onload = function () {
             style: {
                 'label': 'data(label)',
                 "font-size": 3,
-                'width': 2,
+                'width': 1,
                 'arrow-scale': 0.5,
                 'curve-style': 'bezier',
                 'text-rotation': 'autorotate',
