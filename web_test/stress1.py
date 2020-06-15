@@ -34,7 +34,7 @@ while False == False:
     client = random.choice(clients)
     num = random.randint(0,100)
 
-    if num <= 20 and len(pub_topics) < 10:
+    if num <= 50 and len(pub_topics) < 10:
         topic = ""
         for _ in range(random.randint(1,3)):
             topic += rand_str(random.randint(2,7)) + "/"
@@ -45,7 +45,7 @@ while False == False:
 
         client.publish(topic, rand_str(random.randint(10,50)), retain=False)
 
-    elif num <= 60 and len(sub_topics) > 0:
+    elif num <= 75 and len(sub_topics) > 0:
         topic = random.choice(sub_topics)
         print "unsubbed to", topic
         client.unsubscribe(topic)

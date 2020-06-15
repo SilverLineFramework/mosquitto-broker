@@ -1,15 +1,13 @@
 let cytoscape = require('cytoscape');
 let coseBilkent = require('cytoscape-cose-bilkent');
 
+var ready = false;
+
 window.onload = function () {
     cytoscape.use(coseBilkent);
     var cy = window.cy = cytoscape({
         container: document.getElementById('cy'),
         boxSelectionEnabled: false,
-        layout: {
-          name: 'cose-bilkent',
-          animationDuration: 100
-        },
 
         style: [{
             selector: 'node',
@@ -51,15 +49,16 @@ window.onload = function () {
             style: {
                 'label': 'data(label)',
                 "font-size": 3,
-                'width': 1,
+                'width': 2,
+                'arrow-scale': 0.5,
                 'curve-style': 'bezier',
-                'target-arrow-shape': 'triangle-cross',
-                'arrow-scale': 0.5
+                'text-rotation': 'autorotate',
+                'target-arrow-shape': 'triangle-cross'
             }
         }],
         elements: []
     });
-    runLayout();
+    ready = true;
 }
 
 const client = new Paho.MQTT.Client("ws://127.0.0.1:9001/", "client_js_" + new Date().getTime());
@@ -71,9 +70,8 @@ client.onMessageArrived = onMessageArrived;
 
 client.connect({ onSuccess: onConnect });
 
-let count = 0;
 function onConnect() {
-    console.log("onConnect");
+    console.log("Connected!");
     client.subscribe(topic);
     // setInterval(() => { publish(topic, `The count is now ${count++}`) }, 1000)
 
@@ -103,16 +101,18 @@ function runLayout() {
 }
 
 function onMessageArrived(message) {
-    console.log(message.payloadString);
+    if (ready) {
+        console.log(message.payloadString);
 
-    var newJSON = JSON.parse(message.payloadString);
+        var newJSON = JSON.parse(message.payloadString);
 
-    for (var i = 0; i < newJSON.length; i++) {
-        var elem = cy.getElementById(newJSON[i]["data"]["id"]);
-        newJSON[i]["position"] = elem.position();
+        // for (var i = 0; i < newJSON.length; i++) {
+        //     var elem = cy.getElementById(newJSON[i]["data"]["id"]);
+        //     newJSON[i]["position"] = elem.position();
+        // }
+
+        cy.json({ elements: newJSON });
+
+        runLayout();
     }
-
-    cy.json({ elements: newJSON });
-
-    runLayout();
 }

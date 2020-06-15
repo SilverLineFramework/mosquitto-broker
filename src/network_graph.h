@@ -5,55 +5,41 @@
 
 #include "mosquitto.h"
 
-typedef enum {
-    PUB, SUB
-} edge_type_t;
+struct client;
 
-struct topic_name {
-    struct topic_name *next;
-    unsigned long hash_id;
+struct sub_edge {
+    cJSON *json;
+    struct client *sub;
+    struct sub_edge *next;
+    // unsigned long client_hash;
 };
 
-struct edge {
-    edge_type_t type;
+struct topic {
     cJSON *json;
-    struct edge *next;
-    unsigned long hash_id;
+    struct topic *next;
+    struct sub_edge *sub_list;
+    char *full_name;
+    unsigned int ref_cnt;
 };
 
-struct ip_vertex {
+struct client {
     cJSON *json;
-    struct ip_vertex *next;
-    unsigned long hash_id;
-    unsigned long ref_cnt;
+    cJSON *pub_json;
+    struct client *next;
+    struct topic *pub_topic;
+    unsigned long hash;
 };
 
-struct client_vertex {
+struct ip_container {
     cJSON *json;
-    struct client_vertex *next;
-    struct edge *edge_list;
-    struct edge *edge_tail;
-    struct ip_vertex *parent;
-    unsigned long hash_id;
-};
-
-struct topic_vertex {
-    cJSON *json;
-    struct topic_vertex *next;
-    char *full_topic;
-    struct topic_name *topic;
-    struct topic_name *topic_tail;
-    unsigned long hash_id;
-    unsigned long ref_cnt;
+    struct ip_container *next;
+    struct client *client_list;
+    unsigned long hash;
 };
 
 struct network_graph {
-    struct ip_vertex *ip_start;
-    struct ip_vertex *ip_end;
-    struct client_vertex *client_start;
-    struct client_vertex *client_end;
-    struct topic_vertex *topic_start;
-    struct topic_vertex *topic_end;
+    struct ip_container *ip_list;
+    struct topic *topic_list;
 };
 
 int network_graph_init();

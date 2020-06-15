@@ -50,6 +50,7 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 			break;
 		case CMD_PUBLISH:
 			rc = handle__publish(db, context);
+			network_graph_pub(db);
 			break;
 		case CMD_PUBREC:
 			rc = handle__pubrec(db, context);
@@ -61,15 +62,18 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 			rc = handle__connect(db, context);
 			if (rc != MOSQ_ERR_PROTOCOL)
 				network_graph_add_client(context);
+			network_graph_pub(db);
 			break;
 		case CMD_DISCONNECT:
 			rc = handle__disconnect(db, context);
 			break;
 		case CMD_SUBSCRIBE:
 			rc = handle__subscribe(db, context);
+			network_graph_pub(db);
 			break;
 		case CMD_UNSUBSCRIBE:
 			rc = handle__unsubscribe(db, context);
+			network_graph_pub(db);
 			break;
 #ifdef WITH_BRIDGE
 		case CMD_CONNACK:
@@ -91,11 +95,12 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 			break;
 	}
 
-	if (rc != MOSQ_ERR_PROTOCOL)
-		network_graph_pub(db);
-	else
-		log__printf(NULL, MOSQ_LOG_NOTICE, "protocol error!");
-
+	// if (rc != MOSQ_ERR_PROTOCOL) {
+	// 	network_graph_pub(db);
+	// }
+	// else {
+	// 	log__printf(NULL, MOSQ_LOG_NOTICE, "protocol error!");
+	// }
 
 	return rc;
 }
