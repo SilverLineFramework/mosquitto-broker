@@ -18,7 +18,9 @@ struct topic {
     struct topic *next;
     struct sub_edge *sub_list;  // list of all subscriptions
     char *full_name;            // full topic name
+    unsigned long hash;         // hash(full_name)
     unsigned int ref_cnt;       // # of clients pubbed to topic
+    time_t timeout;             // time until deletion
 };
 
 struct client {
@@ -47,6 +49,7 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic);
 int network_graph_add_pubtopic(struct mosquitto *context, const char *topic);
 int network_graph_delete_client(struct mosquitto *context);
 int network_graph_delete_subtopic(struct mosquitto *context, const char *topic);
+void network_graph_update(struct mosquitto_db *db, int interval);
 int network_graph_pub(struct mosquitto_db *db);
 
 #endif

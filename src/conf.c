@@ -200,6 +200,7 @@ static void config__init_reload(struct mosquitto_db *db, struct mosquitto__confi
 	config->retain_available = true;
 	config->set_tcp_nodelay = false;
 	config->sys_interval = 10;
+	config->graph_interval = 10;
 	config->upgrade_outgoing_qos = false;
 
 	config__cleanup_plugins(config);
@@ -581,6 +582,7 @@ void config__copy(struct mosquitto__config *src, struct mosquitto__config *dest)
 
 	dest->queue_qos0_messages = src->queue_qos0_messages;
 	dest->sys_interval = src->sys_interval;
+	dest->graph_interval = src->graph_interval;
 	dest->upgrade_outgoing_qos = src->upgrade_outgoing_qos;
 
 #ifdef WITH_WEBSOCKETS
@@ -653,7 +655,7 @@ int config__read(struct mosquitto_db *db, struct mosquitto__config *config, bool
 				}
 
 				/* Check plugins loaded to see if they have username/password checks enabled */
-				for(j=0; j<config->listeners[i].security_options.auth_plugin_config_count; j++){ 
+				for(j=0; j<config->listeners[i].security_options.auth_plugin_config_count; j++){
 					plugin = &config->listeners[i].security_options.auth_plugin_configs[j].plugin;
 
 					if(plugin->version == 3 || plugin->version == 2){
@@ -685,7 +687,7 @@ int config__read(struct mosquitto_db *db, struct mosquitto__config *config, bool
 			}
 
 			/* Check plugins loaded to see if they have username/password checks enabled */
-			for(j=0; j<config->security_options.auth_plugin_config_count; j++){ 
+			for(j=0; j<config->security_options.auth_plugin_config_count; j++){
 				plugin = &config->security_options.auth_plugin_configs[j].plugin;
 
 				if(plugin->version == 3 || plugin->version == 2){
@@ -1898,6 +1900,12 @@ int config__read_file_core(struct mosquitto__config *config, bool reload, struct
 						log__printf(NULL, MOSQ_LOG_ERR, "Error: Invalid sys_interval value (%d).", config->sys_interval);
 						return MOSQ_ERR_INVAL;
 					}
+				}else if(!strcmp(token, "graph_interval")){
+					if(conf__parse_int(&token, "graph_interval", &config->graph_interval, saveptr)) return MOSQ_ERR_INVAL;
+					if(config->graph_interval < 0 || config->graph_interval > 65535){
+						log__printf(NULL, MOSQ_LOG_ERR, "Error: Invalid graph_interval value (%d).", config->graph_interval);
+						return MOSQ_ERR_INVAL;
+					}
 				}else if(!strcmp(token, "threshold")){
 #ifdef WITH_BRIDGE
 					if(reload) continue; /* FIXME */
@@ -2033,7 +2041,7 @@ int config__read_file_core(struct mosquitto__config *config, bool reload, struct
 										log__printf(NULL, MOSQ_LOG_ERR, "Error: Invalid bridge topic local prefix and pattern combination '%s'.", cur_topic->local_prefix);
 										return MOSQ_ERR_INVAL;
 									}
-									
+
 									/* Print just the prefix for storage */
 									snprintf(cur_topic->local_prefix, strlen(cur_topic->topic) + strlen(token)+1,
 											"%s", token);
@@ -2062,7 +2070,7 @@ int config__read_file_core(struct mosquitto__config *config, bool reload, struct
 													cur_topic->remote_prefix);
 											return MOSQ_ERR_INVAL;
 										}
-									
+
 										/* Print just the prefix for storage */
 										snprintf(cur_topic->remote_prefix, strlen(cur_topic->topic) + strlen(token)+1,
 												"%s", token);

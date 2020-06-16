@@ -52,12 +52,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }]
     });
 
-    const client_main = new Paho.MQTT.Client("ws://127.0.0.1:9001/", "client_js_" + new Date().getTime());
-
+    const ip_main = "localhost";//"spatial.andrew.cmu.edu";
+    const port = 9001;
+    const client_main = new Paho.MQTT.Client(`ws://${ip_main}:${port}/`, "client_js_" + new Date().getTime());
     const topic = "$SYS/graph";
 
     let action = null;
-
     let oldJSON = null;
 
     let modal = document.getElementById("modalView");
@@ -211,7 +211,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     client_id = "client_js_" + new Date().getTime();
                 }
                 clients[ip] = {};
-                clients[ip][client_id] = new Paho.MQTT.Client(`ws://${ip}:9001/`, client_id);
+                clients[ip][client_id] = new Paho.MQTT.Client(`ws://${ip}:${port}/`, client_id);
                 clients[ip][client_id].connect();
                 break;
             case "Publish":
