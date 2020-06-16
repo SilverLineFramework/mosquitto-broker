@@ -5,7 +5,7 @@ brokers = ["127.0.0.1", "192.168.0.32"]
 port = 9001
 
 client1 = mqtt.Client("client_py1", clean_session=True, userdata=None, transport="websockets")
-client2 = mqtt.Client("client_py2", clean_session=True, userdata=None, transport="websockets")
+client2 = mqtt.Client("client_py1", clean_session=True, userdata=None, transport="websockets")
 
 client1.connect(brokers[0], port)
 client1.loop_start()

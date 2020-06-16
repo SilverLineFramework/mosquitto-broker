@@ -1,0 +1,115 @@
+body {
+    font-family: "Lato", sans-serif;
+    height: 100%;
+}
+
+#container {
+    overflow: hidden;
+}
+
+.console {
+    height: 5%;
+    width: 100%;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #222222;
+    overflow-x: hidden;
+    padding: 20px;
+}
+
+.console button {
+    width: 150px;
+    padding: 6px 8px 6px 16px;
+    text-decoration: none;
+    font-size: 15px;
+    color: black;
+    text-align: center;
+    display: inline-block;
+}
+
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgb(0,0,0);
+    background-color: rgba(0,0,0,0.4);
+    padding-top: 25px;
+    padding-left: 575px;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 15%;
+    height: 85%;
+    right: 0;
+}
+
+.close {
+    color: #aaaaaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+#msg {
+    white-space: pre;
+    overflow-x: auto;
+}
+
+@media screen and (max-height: 450px) {
+    .console {padding-top: 15px;}
+    .console a {font-size: 18px;}
+}
+
+input[type=text], select {
+    width: 100%;
+    padding: 5px 10px;
+    margin: 8px 0;
+    display: block;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+#action {
+    width: 100%;
+    background-color: #4CAF50;
+    color: white;
+    padding: 14px 20px;
+    margin: 8px 0;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#action:hover {
+    background-color: #45a049;
+}
+
+#cy {
+    height: 95%;
+    width: 100%;
+    background-color: #eeeeee;
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: -1;
+}

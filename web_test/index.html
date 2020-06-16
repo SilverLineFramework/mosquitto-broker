@@ -1,30 +1,64 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<head>
-    <meta charset="utf-8">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
-    <script src="./dist/main.js" type="text/javascript"></script>
+        <link rel="stylesheet" href="./style.css">
 
-    <style type="text/css">
-        #cy {
-            width: 100%;
-            height: 100%;
-            background-color: #eeeeee;
-            position: absolute;
-            left: 0;
-            top: 0;
-            z-index: -1;
-        }
-    </style>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js" type="text/javascript"></script>
+        <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
 
-    <title>MQTT Network</title>
+        <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.10/lodash.min.js"></script>
+        <script src="https://unpkg.com/layout-base/layout-base.js"></script>
+        <script src="https://unpkg.com/cose-base/cose-base.js"></script>
+        <script src="cytoscape-cose-bilkent.js"></script>
+        <script src="./src/index.js" type="text/javascript"></script>
 
-</head>
+        <title>MQTT Network</title>
 
-<body>
-    <h1>MQTT Network Demo</h1>
-    <div id="cy"></div>
-</body>
+    </head>
 
+    <body>
+        <h1>MQTT Network Demo</h1>
+        <div id="container">
+            <div id="cy"></div>
+            <div class="console">
+                <button id="connect">Connect</button>
+                <button id="pub">Pub</button>
+                <button id="sub">Sub</button>
+                <button id="unsub">Unsub</button>
+                <button id="disconnect">Disconnect</button>
+            </div>
+        </div>
+
+        <div id="modalView" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h3 id="title">title</h3>
+                <div id="ipDiv">
+                    <label for="addresses">IP Address:</label>
+                    <select name="addresses" id="addresses">
+                        <option value="localhost">127.0.0.1</option>
+                        <option value="192.168.0.32">192.168.0.32</option>
+                        <option value="Edwards-MacBook-Air.local">Edwards-MacBook-Air.local</option>
+                    </select>
+                </div>
+                <div id="clientDiv">
+                    <label for="client">Client ID:</label>
+                    <input type="text" id="client">
+                </div>
+                <div id="topicDiv">
+                    <label for="topic">Topic Name:</label>
+                    <input type="text" id="topic">
+                </div>
+                <div id="intervalDiv">
+                    <label for="topic">Pub Interval (secs):</label>
+                    <input type="text" id="interval">
+                </div>
+                <button id="action">Submit</button>
+                <textarea id="msg" rows="22" cols="25"></textarea>
+            </div>
+        </div>
+    </body>
 </html>

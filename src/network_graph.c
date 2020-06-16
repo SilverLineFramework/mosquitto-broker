@@ -491,10 +491,10 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
 
     // iterate through all topics and delete sub edges that are subbed to client
     for (; curr != NULL; curr = curr->next) {
-        mosquitto_topic_matches_sub(context->id, curr->full_name, &match);
+        mosquitto_topic_matches_sub(topic, curr->full_name, &match);
         if (match) {
             if (graph_delete_sub_edge(curr, client) < 0) {
-                log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: unsub from %s", topic);
+                // log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: unsub from %s", topic);
             }
         }
     }
