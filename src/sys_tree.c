@@ -224,7 +224,6 @@ void sys_tree__update(struct mosquitto_db *db, int interval, time_t start_time)
 		uptime = now - start_time;
 		snprintf(buf, BUFLEN, "%d seconds", (int)uptime);
 		db__messages_easy_queue(db, NULL, "$SYS/broker/uptime", SYS_TREE_QOS, strlen(buf), buf, 1, 60, NULL);
-
 		// network_graph_pub(db);
 		// log__printf(NULL, MOSQ_LOG_NOTICE, "pubbed");
 

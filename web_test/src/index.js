@@ -13,33 +13,32 @@ document.addEventListener('DOMContentLoaded', function() {
         }, {
             selector: 'node[class="client"]',
             style: {
-                "font-size": 6,
+                "font-size": 3.5,
                 'shape': 'round-rectangle',
                 'background-color': 'LightGray'
             }
         }, {
             selector: 'node[class="topic"]',
             style: {
-                "font-size": 6,
+                "font-size": 5,
                 'shape': 'ellipse',
                 'background-color': 'LightBlue'
             }
         }, {
             selector: 'node[class="client ip"]',
             style: {
-                "font-size": 6,
+                "font-size": 5,
                 'shape': 'barrel',
                 'background-color': 'Coral'
             }
         }, {
             selector: ':parent',
             css: {
-                'text-valign': 'top',
+                'text-valign': 'bottom',
                 'text-halign': 'center',
             }
         }, {
             selector: 'edge',
-            css: { },
             style: {
                 'label': 'data(label)',
                 "font-size": 3,
@@ -53,7 +52,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     const ip_main = "localhost";//"spatial.andrew.cmu.edu";
-    const port = 9001;
+    const port = 9001; // 9000
     const client_main = new Paho.MQTT.Client(`ws://${ip_main}:${port}/`, "client_js_" + new Date().getTime());
     const topic = "$SYS/graph";
 
@@ -68,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let topicElem = document.getElementById("topicDiv");
     let intervalElem = document.getElementById("intervalDiv");
 
-    let msg = document.getElementById("msg");
+    let msgText = document.getElementById("msg");
 
     client_main.onConnectionLost = onConnectionLost;
     client_main.onMessageArrived = onMessageArrived;
@@ -88,7 +87,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function publish(client, dest, msg) {
-        console.log('desint :', dest, 'msggg', msg)
         let message = new Paho.MQTT.Message(msg);
         message.destinationName = dest;
         client.send(message);
@@ -106,9 +104,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function onMessageArrived(message) {
         var newJSON = JSON.parse(message.payloadString);
-        msg.value = JSON.stringify(newJSON, undefined, 4);
-        console.log(msg.value)
-
+        msgText.value = JSON.stringify(newJSON, undefined, 4);
+        // console.log(msgText.value);
         try {
             cy.json({ elements: newJSON });
             if (!_.isEqual(oldJSON, newJSON)) {
@@ -118,9 +115,18 @@ document.addEventListener('DOMContentLoaded', function() {
         catch (err) {
             console.log(err.message)
         }
-
         oldJSON = newJSON;
     }
+
+    cy.on("tap", "node", function(event) {
+        let obj = event.target;
+        let tapped_node = cy.$id(obj.id()).data();
+        console.log(tapped_node["id"]);
+    });
+
+    // cy.on('tap', function(event) {
+    //     var obj = event.target;
+    // });
 
     function undisplayModal() {
         modal.style.display = "none";
@@ -154,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    window.onclick = function() {
+    window.onclick = function(event) {
         if (event.target == modal) {
             undisplayModal()
         }
@@ -253,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
             default:
                 break;
         }
-        console.log(client_id, topic_id, action);
-        console.log(clients);
+        // console.log(client_id, topic_id, action);
+        // console.log(clients);
     }
 });

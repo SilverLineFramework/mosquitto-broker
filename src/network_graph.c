@@ -129,6 +129,7 @@ static cJSON *create_topic_json(const char *topic) {
  */
 static struct ip_container *create_ip_container(const char *ip) {
     struct ip_container *ip_cont = (struct ip_container *)mosquitto__malloc(sizeof(struct ip_container));
+    if (!ip_cont) return NULL;
     ip_cont->json = create_ip_json(ip);
     ip_cont->next = NULL;
     ip_cont->client_list = NULL;
@@ -141,6 +142,7 @@ static struct ip_container *create_ip_container(const char *ip) {
  */
 static struct client *create_client(const char *id, const char *address) {
     struct client *client = (struct client *)mosquitto__malloc(sizeof(struct client));
+    if (!client) return NULL;
     client->json = create_client_json(id, address);
     client->pub_json = NULL;
     client->next = NULL;
@@ -154,6 +156,7 @@ static struct client *create_client(const char *id, const char *address) {
  */
 static struct topic *create_topic(const char *name) {
     struct topic *topic = (struct topic *)mosquitto__malloc(sizeof(struct topic));
+    if (!topic) return NULL;
     topic->json = create_topic_json(name);
     topic->sub_list = NULL;
     topic->next = NULL;
@@ -171,6 +174,7 @@ static struct topic *create_topic(const char *name) {
  */
 static struct sub_edge *create_sub_edge(const char *src, const char *tgt) {
     struct sub_edge *sub_edge = (struct sub_edge *)mosquitto__malloc(sizeof(struct sub_edge));
+    if (!sub_edge) return NULL;
     sub_edge->json = create_edge_json(src, tgt);
     sub_edge->sub = NULL;
     sub_edge->next = NULL;
@@ -205,10 +209,10 @@ static int graph_add_ip_container(struct ip_container *ip_cont) {
  */
 static struct client *find_client(struct ip_container *ip_cont, const char *id) {
     unsigned long hash = sdbm_hash(id);
-    struct client *client = ip_cont->client_list;
-    for (; client != NULL; client = client->next) {
-        if (hash == client->hash) {
-            return client;
+    struct client *curr = ip_cont->client_list;
+    for (; curr != NULL; curr = curr->next) {
+        if (hash == curr->hash) {
+            return curr;
         }
     }
     return NULL;
@@ -374,15 +378,18 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
                 prev->next = curr->next;
             }
 
+            // if IP container is empty, delete it
             if (ip_cont->client_list == NULL) {
                 graph_delete_ip(ip_cont);
             }
 
+            // unlink client from all subbed topics
             topic = graph->topic_list;
             for (; topic != NULL; topic = topic->next) {
                 graph_delete_sub_edge(topic, curr);
             }
 
+            // if topic is only one pubbed, delete topic by setting timeout
             if (curr->pub_topic != NULL) {
                 --curr->pub_topic->ref_cnt;
                 if (curr->pub_topic->ref_cnt == 0) {
@@ -405,11 +412,15 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
 
 int network_graph_init(void) {
     graph = (struct network_graph *)mosquitto__malloc(sizeof(struct network_graph));
+    if (!graph) return -1;
     graph->ip_list = NULL;
     graph->topic_list = NULL;
     return 0;
 }
 
+/*
+ * Called after client connects
+ */
 int network_graph_add_client(struct mosquitto *context) {
     struct ip_container *ip_cont;
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
@@ -420,9 +431,13 @@ int network_graph_add_client(struct mosquitto *context) {
     if (find_client(ip_cont, context->id) == NULL) {
         graph_add_client(ip_cont, create_client(context->id, context->address));
     }
+
     return 0;
 }
 
+/*
+ * Called after client publishes to topic
+ */
 int network_graph_add_pubtopic(struct mosquitto *context, const char *topic) {
     struct ip_container *ip_cont;
     struct client *client;
@@ -431,10 +446,12 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic) {
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
+        return -1;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
+        return -1;
     }
 
     if ((topic_vert = find_pub_topic(topic)) == NULL) {
@@ -444,8 +461,9 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic) {
     }
 
     if (client->pub_topic != NULL &&
-        (--client->pub_topic->ref_cnt) == 0 &&
+        client->pub_topic->ref_cnt == 1 &&
         topic_hash != client->pub_topic->hash) {
+        --client->pub_topic->ref_cnt;
         client->pub_topic->timeout = PUB_DEL_TIMEOUT;
         // graph_delete_topic(client->pub_topic);
     }
@@ -457,6 +475,9 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic) {
     return 0;
 }
 
+/*
+ * Called after client subscribes to topic
+ */
 int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
     struct ip_container *ip_cont;
     struct client *client;
@@ -465,10 +486,12 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
+        return -1;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
+        return -1;
     }
 
     if ((topic_vert = find_sub_topic(topic)) != NULL) {
@@ -480,6 +503,9 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
     return 0;
 }
 
+/*
+ * Called after client unsubscribes to topic
+ */
 int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) {
     struct ip_container *ip_cont;
     struct client *client;
@@ -487,10 +513,12 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
+        return -1;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
+        return -1;
     }
 
     if ((topic_vert = find_sub_topic(topic)) != NULL) {
@@ -500,6 +528,9 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
     return 0;
 }
 
+/*
+ * Called before client disconnects
+ */
 int network_graph_delete_client(struct mosquitto *context) {
     struct ip_container *ip_cont;
     struct client *client;
@@ -507,20 +538,26 @@ int network_graph_delete_client(struct mosquitto *context) {
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
+        return -1;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
+        return -1;
     }
     else {
         if (graph_delete_client(ip_cont, client) < 0) {
             log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not delete client!");
+            return -1;
         }
     }
 
     return 0;
 }
 
+/*
+ * Called every db->config->graph_interval units (currently every 10s)
+ */
 void network_graph_update(struct mosquitto_db *db, int interval) {
     static time_t last_update = 0;
     struct topic *curr = graph->topic_list, *prev = NULL;
@@ -529,8 +566,8 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
     if (interval && now - interval > last_update) {
         while (curr != NULL) { // delete topics that reached timeout
             if (curr->ref_cnt == 0) {
-                curr->timeout -= 1;
-                if (curr->timeout == 0) {
+                curr->timeout -= 1; // update timeout
+                if (curr->timeout == 0) { // only delete if timeout is 0
                     curr = graph_detach_topic(prev, curr);
                     graph_delete_topic_sub_edges(curr);
                     cJSON_Delete(curr->json);
@@ -549,6 +586,9 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
     }
 }
 
+/*
+ * Publishes network graph as JSON
+ */
 int network_graph_pub(struct mosquitto_db *db) {
     char *json_buf;
     cJSON *root = cJSON_CreateArray(), *elem, *temp;
@@ -557,29 +597,32 @@ int network_graph_pub(struct mosquitto_db *db) {
     struct sub_edge *sub_edge;
     struct topic *topic = graph->topic_list;
 
+    // graph has a list of all IP addresses
     for (; ip_cont != NULL; ip_cont = ip_cont->next) {
         cJSON_AddItemToArray(root, ip_cont->json);
-        client = ip_cont->client_list;
+        client = ip_cont->client_list; // each IP address holds a list of clients
         for (; client != NULL; client = client->next) {
             cJSON_AddItemToArray(root, client->json);
-            if (client->pub_topic != NULL) {
+            if (client->pub_topic != NULL) { // client may have a published topic
                 cJSON_AddItemToArray(root, client->pub_json);
             }
         }
     }
 
+    // graph has a list of all topics that are pubbed
     for (; topic != NULL; topic = topic->next) {
         cJSON_AddItemToArray(root, topic->json);
-        sub_edge = topic->sub_list;
+        sub_edge = topic->sub_list; // each topic has a list of subscribed clients
         for (; sub_edge != NULL; sub_edge = sub_edge->next) {
             cJSON_AddItemToArray(root, sub_edge->json);
         }
     }
 
     json_buf = cJSON_Print(root);
+    // publish to $SYS/graph topic
     db__messages_easy_queue(db, NULL, "$SYS/graph", 2, strlen(json_buf), json_buf, 1, 10, NULL);
 
-    // unlink all nodes
+    // unlink all JSON nodes
     elem = root->child;
     while (elem != NULL) {
         temp = elem;
