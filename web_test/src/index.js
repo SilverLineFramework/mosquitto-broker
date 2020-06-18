@@ -95,8 +95,12 @@ document.addEventListener('DOMContentLoaded', function() {
     function runLayout() {
         cy.layout({
             name: 'cose-bilkent',
-            padding: 200,
+            padding: 50,
+            fit: true,
             animate: true,
+            nodeRepulsion: 500,
+            tilingPaddingVertical: 5,
+            tilingPaddingHorizontal: 5,
             animationDuration: 100,
             animationEasing: 'ease-out'
         }).run();
@@ -106,6 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
         var newJSON = JSON.parse(message.payloadString);
         msgText.value = JSON.stringify(newJSON, undefined, 4);
         // console.log(msgText.value);
+
         try {
             cy.json({ elements: newJSON });
             if (!_.isEqual(oldJSON, newJSON)) {
@@ -210,13 +215,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         switch (action) {
             case "Connect":
-                if (clients[ip] != undefined &&
-                    clients[ip][client_id] != undefined) break;
+                if (clients[ip] == undefined) {
+                    clients[ip] = {};
+                }
+                if (clients[ip][client_id] != undefined) break;
 
                 if (client_id == "") {
                     client_id = "client_js_" + new Date().getTime();
                 }
-                clients[ip] = {};
+
                 clients[ip][client_id] = new Paho.MQTT.Client(`ws://${ip}:${port}/`, client_id);
                 clients[ip][client_id].connect();
                 break;
@@ -228,10 +235,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     clearInterval(clients[ip][client_id]["pub"]);
                 }
 
-                publish(clients[ip][client_id], topic_id, "init")
+                publish(clients[ip][client_id], topic_id, "pub msg");
+
                 clients[ip][client_id]["pub"] = setInterval(() => {
-                    publish(clients[ip][client_id], topic_id, "test")
+                    publish(clients[ip][client_id], topic_id, "pub msg")
                 }, interval);
+
                 break;
             case "Subscribe":
                 if (clients[ip] == undefined || clients[ip][client_id] == undefined ||

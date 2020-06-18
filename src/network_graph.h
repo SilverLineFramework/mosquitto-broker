@@ -11,11 +11,13 @@ struct sub_edge {
     cJSON *json;                // edge JSON
     struct client *sub;         // pointer to client that is subbed to topic
     struct sub_edge *next;
+    struct sub_edge *prev;
 };
 
 struct topic {
     cJSON *json;
     struct topic *next;
+    struct topic *prev;
     struct sub_edge *sub_list;  // list of all subscriptions
     char *full_name;            // full topic name
     unsigned long hash;         // hash(full_name)
@@ -27,6 +29,7 @@ struct client {
     cJSON *json;
     cJSON *pub_json;            // JSON of currently pubbed topic
     struct client *next;
+    struct client *prev;
     struct topic *pub_topic;    // current topic client is pubbing to
     unsigned long hash;         // hash(client_id)
 };
@@ -34,6 +37,7 @@ struct client {
 struct ip_container {
     cJSON *json;
     struct ip_container *next;
+    struct ip_container *prev;
     struct client *client_list; // list of all clients with specific IP address
     unsigned long hash;         // hash(IP)
 };
@@ -46,7 +50,7 @@ struct network_graph {
 int network_graph_init(void);
 int network_graph_add_client(struct mosquitto *context);
 int network_graph_add_subtopic(struct mosquitto *context, const char *topic);
-int network_graph_add_pubtopic(struct mosquitto *context, const char *topic);
+int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uint32_t payloadlen);
 int network_graph_delete_client(struct mosquitto *context);
 int network_graph_delete_subtopic(struct mosquitto *context, const char *topic);
 void network_graph_update(struct mosquitto_db *db, int interval);
