@@ -5,56 +5,67 @@ document.addEventListener('DOMContentLoaded', function() {
 
         style: [{
             selector: 'node',
-            css: {
+            style: {
                 'content': 'data(label)',
                 'text-valign': 'center',
-                'text-halign': 'center'
+                'text-halign': 'center',
+                'font-family' : 'Courier',
+                'text-outline-width': 0.5
             }
         }, {
             selector: 'node[class="client"]',
             style: {
                 "font-size": 3.5,
                 'shape': 'round-rectangle',
-                'background-color': 'LightGray'
+                'background-color': 'Coral',
+                'text-outline-color': 'Coral'
             }
         }, {
             selector: 'node[class="topic"]',
             style: {
-                "font-size": 5,
+                "font-size": 3.5,
                 'shape': 'ellipse',
-                'background-color': 'LightBlue'
+                'background-color': 'LightBlue',
+                'text-outline-color': 'LightBlue'
             }
         }, {
             selector: 'node[class="client ip"]',
             style: {
-                "font-size": 5,
+                "font-size": 4,
                 'shape': 'barrel',
-                'background-color': 'Coral'
+                'background-color': '#9e9199',
+                'text-outline-color': '#9e9199'
             }
         }, {
             selector: ':parent',
-            css: {
+            style: {
                 'text-valign': 'bottom',
                 'text-halign': 'center',
+                'text-margin-y': -5
             }
         }, {
             selector: 'edge',
             style: {
                 'label': 'data(label)',
-                "font-size": 3,
+                "font-size": 2,
                 'width': 1,
                 'arrow-scale': 0.5,
+                'font-family' : 'Courier',
+                'line-color': 'LightGray',
+                'target-arrow-color': 'LightGray',
                 'curve-style': 'bezier',
-                'text-rotation': 'autorotate',
-                'target-arrow-shape': 'triangle-cross'
+                // 'text-rotation': 'autorotate',
+                'target-arrow-shape': 'triangle-backcurve',
+                'text-outline-width': 0.5,
+                'text-outline-color': 'LightGray'
             }
         }]
     });
 
     const ip_main = "localhost";//"spatial.andrew.cmu.edu";
     const port = 9001; // 9000
-    const client_main = new Paho.MQTT.Client(`ws://${ip_main}:${port}/`, "client_js_" + new Date().getTime());
-    const topic = "$SYS/graph";
+    const client_main = new Paho.MQTT.Client(`ws://${ip_main}:${port}/`, "browser_" + new Date().getTime());
+    const graph_topic = "$SYS/graph";
 
     let action = null;
     let oldJSON = null;
@@ -66,6 +77,7 @@ document.addEventListener('DOMContentLoaded', function() {
     let clientElem = document.getElementById("clientDiv");
     let topicElem = document.getElementById("topicDiv");
     let intervalElem = document.getElementById("intervalDiv");
+    let bpsElem = document.getElementById("bpsDiv");
 
     let msgText = document.getElementById("msg");
 
@@ -76,7 +88,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function onConnect() {
         console.log("Connected!");
-        client_main.subscribe(topic);
+        client_main.subscribe(graph_topic);
     }
 
     function onConnectionLost(responseObject) {
@@ -94,13 +106,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function runLayout() {
         cy.layout({
-            name: 'cose-bilkent',
+            name: 'fcose',
             padding: 50,
             fit: true,
             animate: true,
-            nodeRepulsion: 500,
-            tilingPaddingVertical: 5,
-            tilingPaddingHorizontal: 5,
+            nodeRepulsion: 4500,
+            idealEdgeLength: 50,
+            tile: true,
+            tilingPaddingVertical: 10,
+            tilingPaddingHorizontal: 10,
             animationDuration: 100,
             animationEasing: 'ease-out'
         }).run();
@@ -139,6 +153,7 @@ document.addEventListener('DOMContentLoaded', function() {
         clientElem.style.display = "block";
         topicElem.style.display = "block";
         intervalElem.style.display = "block";
+        bpsElem.style.display = "block";
     }
 
     function displayModal(action) {
@@ -148,16 +163,20 @@ document.addEventListener('DOMContentLoaded', function() {
             case "Connect":
                 topicElem.style.display = "none";
                 intervalElem.style.display = "none";
+                bpsElem.style.display = "none";
                 break;
             case "Subscribe":
                 intervalElem.style.display = "none";
+                bpsElem.style.display = "none";
                 break;
             case "Unsubscribe":
                 intervalElem.style.display = "none";
+                bpsElem.style.display = "none";
                 break;
             case "Disconnect":
                 topicElem.style.display = "none";
                 intervalElem.style.display = "none";
+                bpsElem.style.display = "none";
                 break;
             case "Publish":
             default:
@@ -212,6 +231,8 @@ document.addEventListener('DOMContentLoaded', function() {
         let topic_id = document.getElementById("topic").value;
         let intervalStr = document.getElementById("interval").value;
         let interval = parseInt(intervalStr);
+        let bpsStr = document.getElementById("bps").value;
+        let bps = parseInt(bpsStr);
 
         switch (action) {
             case "Connect":
@@ -229,16 +250,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
             case "Publish":
                 if (clients[ip] == undefined || clients[ip][client_id] == undefined ||
-                    topic_id == "" || isNaN(intervalStr)) break;
+                    topic_id == "" || isNaN(intervalStr) || isNaN(bpsStr)) break;
 
                 if (clients[ip][client_id]["pub"]) {
                     clearInterval(clients[ip][client_id]["pub"]);
                 }
 
-                publish(clients[ip][client_id], topic_id, "pub msg");
-
                 clients[ip][client_id]["pub"] = setInterval(() => {
-                    publish(clients[ip][client_id], topic_id, "pub msg")
+                    publish(clients[ip][client_id], topic_id, "x".repeat(bps));
                 }, interval);
 
                 break;

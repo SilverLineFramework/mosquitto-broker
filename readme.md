@@ -10,7 +10,7 @@ This repo is made with the goal to monitor and visualize connected pub/sub clien
 
 ## Building
 
-If you are using a Mac, run ```./setup.sh``` and then run ```./build.sh``` to build binaries
+If you are using Mac or Linux, run ```./setup.sh``` and then run ```./build.sh``` to build binaries
 with websockets support.
 
 Server and client executables will be found in the bin/ directory.

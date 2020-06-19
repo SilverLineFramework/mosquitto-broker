@@ -32,7 +32,7 @@ sub_topics = [start_topic]
 
 while False == False:
     client = random.choice(clients)
-    num = random.randint(0,100)
+    num = random.randint(0, 100)
 
     if num <= 40:
         topic = ""
@@ -40,9 +40,7 @@ while False == False:
             topic += rand_str(random.randint(2,7)) + "/"
         topic += rand_str(2)
         pub_topics += [topic]
-
         print "pubbed to", topic
-
         client.publish(topic, rand_str(random.randint(10,50)), retain=False)
 
     elif num <= 70 and len(sub_topics) > 0:

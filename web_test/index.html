@@ -11,7 +11,7 @@
         <script src="https://unpkg.com/cytoscape/dist/cytoscape.min.js"></script>
         <script src="https://unpkg.com/layout-base/layout-base.js"></script>
         <script src="https://unpkg.com/cose-base/cose-base.js"></script>
-        <script src="https://unpkg.com/cytoscape-cose-bilkent/cytoscape-cose-bilkent.js"></script>
+        <script src="https://unpkg.com/cytoscape-fcose/cytoscape-fcose.js"></script>
         <!-- <script src="https://unpkg.com/cytoscape-expand-collapse/cytoscape-expand-collapse.js"></script> -->
 
         <script src="./src/index.js" type="text/javascript"></script>
@@ -20,7 +20,7 @@
     </head>
 
     <body>
-        <h1>MQTT Network Demo</h1>
+        <h1 style="color: white;">MQTT Network Demo</h1>
         <div id="container">
             <div id="cy"></div>
             <div class="console">
@@ -54,11 +54,15 @@
                     <input type="text" id="topic">
                 </div>
                 <div id="intervalDiv">
-                    <label for="topic">Pub Interval (secs):</label>
+                    <label for="interval">Pub Interval (ms):</label>
                     <input type="text" id="interval">
                 </div>
+                <div id="bpsDiv">
+                    <label for="bps">Bytes:</label>
+                    <input type="text" id="bps">
+                </div>
                 <button id="action">Submit</button>
-                <textarea id="msg" rows="22" cols="25"></textarea>
+                <textarea id="msg" rows="17" cols="25"></textarea>
             </div>
         </div>
     </body>

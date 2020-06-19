@@ -22,15 +22,20 @@ struct topic {
     char *full_name;            // full topic name
     unsigned long hash;         // hash(full_name)
     unsigned int ref_cnt;       // # of clients pubbed to topic
-    time_t timeout;             // time until deletion
+    uint64_t bytes_in;
+    double bytes_in_per_sec;
+    uint64_t bytes_out;
+    unsigned int timeout;       // time until deletion
 };
 
 struct client {
     cJSON *json;
-    cJSON *pub_json;            // JSON of currently pubbed topic
+    cJSON *pub_json;            // "edge JSON" of currently pubbed topic
     struct client *next;
     struct client *prev;
     struct topic *pub_topic;    // current topic client is pubbing to
+    uint64_t bytes_out;
+    double bytes_out_per_sec;
     unsigned long hash;         // hash(client_id)
 };
 
