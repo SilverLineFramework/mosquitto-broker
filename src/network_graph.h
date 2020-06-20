@@ -22,9 +22,9 @@ struct topic {
     char *full_name;            // full topic name
     unsigned long hash;         // hash(full_name)
     unsigned int ref_cnt;       // # of clients pubbed to topic
-    uint64_t bytes_in;
+    uint32_t bytes_in;
     double bytes_in_per_sec;
-    uint64_t bytes_out;
+    uint32_t bytes_out;
     unsigned int timeout;       // time until deletion
 };
 
@@ -34,7 +34,8 @@ struct client {
     struct client *next;
     struct client *prev;
     struct topic *pub_topic;    // current topic client is pubbing to
-    uint64_t bytes_out;
+    uint32_t bytes_out;
+    uint64_t total_bytes_out;
     double bytes_out_per_sec;
     unsigned long hash;         // hash(client_id)
 };

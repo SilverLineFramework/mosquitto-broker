@@ -153,6 +153,7 @@ static struct client *create_client(const char *id, const char *address) {
     client->pub_topic = NULL;
     client->hash = sdbm_hash(id);
     client->bytes_out = 0;
+    client->total_bytes_out = 0;
     client->bytes_out_per_sec = 0;
     return client;
 }
@@ -478,8 +479,9 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
         graph_add_topic(topic_vert);
     }
 
-    topic_vert->bytes_in += (uint64_t)payloadlen;
-    client->bytes_out += (uint64_t)payloadlen;
+    topic_vert->bytes_in += payloadlen;
+    client->bytes_out += payloadlen;
+    client->total_bytes_out += (uint64_t)payloadlen;
 
     if (client->pub_topic != NULL) { // client is publishing to a topic already
         if (topic_vert != client->pub_topic) { // client is publishing to a new topic

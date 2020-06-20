@@ -25,7 +25,7 @@ while False == False:
         clients += [new_client]
         time.sleep(1)
 
-    elif len(clients) > 3 and num <= 20: # disconnect
+    if len(clients) > 3 and num <= 20: # disconnect
         client = random.choice(clients)
         print "disconnected client"
         client.disconnect()
@@ -33,7 +33,7 @@ while False == False:
         clients.remove(client)
         time.sleep(1)
 
-    elif num <= 50: # pub
+    if num <= 50: # pub
         client = random.choice(clients)
         topic = ""
         for _ in range(random.randint(1,3)):
@@ -44,7 +44,7 @@ while False == False:
         client.publish(topic, rand_str(random.randint(10,100)), retain=False)
         time.sleep(1)
 
-    elif num <= 80: # sub
+    if num <= 80: # sub
         for _ in range(5):
             client = random.choice(clients)
             qos = random.randint(0,2)
@@ -54,7 +54,7 @@ while False == False:
             sub_topics += [topic]
             time.sleep(1)
 
-    elif num <= 100: # unsub
+    if num <= 100: # unsub
         for _ in range(3):
             if len(sub_topics) > 0:
                 client = random.choice(clients)
