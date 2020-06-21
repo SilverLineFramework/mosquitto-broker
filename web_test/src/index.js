@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }, {
             selector: 'node[class="client ip"]',
             style: {
-                "font-size": 4,
+                "font-size": 4.0,
                 'shape': 'barrel',
                 'background-color': '#9e9199',
                 'text-outline-color': '#9e9199'
@@ -48,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
             style: {
                 'label': 'data(label)',
                 "font-size": 2,
-                'width': 1,
+                'width': 1.0,
                 'arrow-scale': 0.5,
                 'font-family' : 'Courier',
                 'line-color': 'LightGray',
