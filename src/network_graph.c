@@ -396,10 +396,6 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
     cJSON_Delete(ip_cont->json);
     mosquitto__free(ip_cont);
 
-    // if (graph->ip_list == NULL) {
-    //     cJSON_Delete(graph->json);
-    //     mosquitto__free(graph);
-    // }
     return 0;
 }
 
@@ -454,7 +450,7 @@ int network_graph_init(void) {
     return 0;
 }
 
-int network_graph_free(void) {
+int network_graph_cleanup(void) {
     struct ip_container *ip_temp;
     struct client *client, *client_temp;
     struct topic *topic_temp;
@@ -518,12 +514,12 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
-        return -1;
+        goto lookup_error;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
-        return -1;
+        goto lookup_error;
     }
 
     if ((topic_vert = find_pub_topic(topic)) == NULL) {
@@ -561,6 +557,10 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
     client->pub_topic = topic_vert;
 
     return 0;
+
+lookup_error:
+    network_graph_cleanup();
+    return -1;
 }
 
 /*
@@ -575,12 +575,12 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
-        return -1;
+        goto lookup_error;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
-        return -1;
+        goto lookup_error;
     }
 
     for (; topic_vert != NULL; topic_vert = topic_vert->next) {
@@ -595,6 +595,10 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
     }
 
     return 0;
+
+lookup_error:
+    network_graph_cleanup();
+    return -1;
 }
 
 /*
@@ -608,12 +612,12 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
-        return -1;
+        goto lookup_error;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
-        return -1;
+        goto lookup_error;
     }
 
     for (; topic_vert != NULL; topic_vert = topic_vert->next) {
@@ -624,6 +628,10 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
     }
 
     return 0;
+
+lookup_error:
+    network_graph_cleanup();
+    return -1;
 }
 
 /*
@@ -636,21 +644,25 @@ int network_graph_delete_client(struct mosquitto *context) {
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
-        return -1;
+        goto lookup_error;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
         log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
-        return -1;
+        goto lookup_error;
     }
     else {
         if (graph_delete_client(ip_cont, client) < 0) {
             log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not delete client!");
-            return -1;
+            goto lookup_error;
         }
     }
 
     return 0;
+
+lookup_error:
+    network_graph_cleanup();
+    return -1;
 }
 
 /*
@@ -698,20 +710,15 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                 // update incoming bytes/s to topic
                 temp_bytes = (double)topic->total_bytes / (now - last_update);
                 topic->total_bytes = 0;
-                if (fabs(temp_bytes - topic->bytes_per_sec) > 0.01) {
-                    topic->bytes_per_sec = temp_bytes;
-                    snprintf(buf, BUFLEN, "%.2f bytes/s", topic->bytes_per_sec);
-                    for (; sub_edge != NULL; sub_edge = sub_edge->next) {
-                        // update incoming bytes/s to client
+                for (; sub_edge != NULL; sub_edge = sub_edge->next) {
+                    // update incoming bytes/s to client
+                    if (fabs(temp_bytes - topic->bytes_per_sec) > 0.01) {
+                        topic->bytes_per_sec = temp_bytes;
+                        snprintf(buf, BUFLEN, "%.2f bytes/s", topic->bytes_per_sec);
                         data = cJSON_GetObjectItem(sub_edge->json, "data");
                         cJSON_SetValuestring(cJSON_GetObjectItem(data, "label"), buf);
-                        cJSON_AddItemToArray(graph->json, sub_edge->json);
                     }
-                }
-                else {
-                    for (; sub_edge != NULL; sub_edge = sub_edge->next) {
-                        cJSON_AddItemToArray(graph->json, sub_edge->json);
-                    }
+                    cJSON_AddItemToArray(graph->json, sub_edge->json);
                 }
                 topic = topic->next;
             }
@@ -781,8 +788,8 @@ void network_graph_pub(struct mosquitto_db *db) {
         }
     }
 
+    // publish json to $SYS/graph topic
     json_buf = cJSON_Print(graph->json);
-    // publish to $SYS/graph topic
     db__messages_easy_queue(db, NULL, "$SYS/graph", 2, strlen(json_buf), json_buf, 1, 10, NULL);
     free(json_buf);
     unlink_json();

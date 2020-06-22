@@ -62,8 +62,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }]
     });
 
-    const ip_main = "spatial.andrew.cmu.edu";
-    const port = 9000;
+    const ip_main = "localhost";//"spatial.andrew.cmu.edu";
+    const port = 9001; // 9000;
     const client_main = new Paho.MQTT.Client(`ws://${ip_main}:${port}/`, "client_js_" + new Date().getTime());
     const graph_topic = "$SYS/graph";
 

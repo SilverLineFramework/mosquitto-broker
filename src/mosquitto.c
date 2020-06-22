@@ -444,7 +444,7 @@ int main(int argc, char *argv[])
 	log__close(&config);
 	config__cleanup(int_db.config);
 	net__broker_cleanup();
-	network_graph_free();
+	network_graph_cleanup();
 
 	return rc;
 }
