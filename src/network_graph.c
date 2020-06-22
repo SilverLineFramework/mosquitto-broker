@@ -612,6 +612,8 @@ static inline void unlink_json(cJSON *root) {
         elem = elem->next;
         temp->next = NULL;
     }
+    root->child = NULL;
+    cJSON_Delete(root);
 }
 
 /*
@@ -689,6 +691,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
         // send out the updated graph
         json_buf = cJSON_Print(root);
         db__messages_easy_queue(db, NULL, "$SYS/graph", 2, strlen(json_buf), json_buf, 1, 10, NULL);
+        free(json_buf);
         unlink_json(root);
 
         last_update = mosquitto_time();
@@ -698,7 +701,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
 /*
  * Publishes network graph as JSON
  */
-int network_graph_pub(struct mosquitto_db *db) {
+void network_graph_pub(struct mosquitto_db *db) {
     char *json_buf;
     cJSON *root = cJSON_CreateArray(), *elem, *temp;
     struct ip_container *ip_cont = graph->ip_list;
@@ -730,7 +733,6 @@ int network_graph_pub(struct mosquitto_db *db) {
     json_buf = cJSON_Print(root);
     // publish to $SYS/graph topic
     db__messages_easy_queue(db, NULL, "$SYS/graph", 2, strlen(json_buf), json_buf, 1, 10, NULL);
+    free(json_buf);
     unlink_json(root);
-
-    return 0;
 }

@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
             selector: 'edge',
             style: {
                 'label': 'data(label)',
-                "font-size": 2,
+                "font-size": 3,
                 'width': 1.0,
                 'arrow-scale': 0.5,
                 'font-family' : 'Courier',
@@ -63,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     const ip_main = "localhost";//"spatial.andrew.cmu.edu";
-    const port = 9001; // 9000
+    const port = 9001; // 9000;
     const client_main = new Paho.MQTT.Client(`ws://${ip_main}:${port}/`, "client_js_" + new Date().getTime());
     const graph_topic = "$SYS/graph";
 

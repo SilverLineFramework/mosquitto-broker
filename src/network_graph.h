@@ -60,6 +60,6 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
 int network_graph_delete_client(struct mosquitto *context);
 int network_graph_delete_subtopic(struct mosquitto *context, const char *topic);
 void network_graph_update(struct mosquitto_db *db, int interval);
-int network_graph_pub(struct mosquitto_db *db);
+void network_graph_pub(struct mosquitto_db *db);
 
 #endif
