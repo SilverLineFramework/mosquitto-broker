@@ -49,6 +49,7 @@ struct ip_container {
 };
 
 struct network_graph {
+    cJSON *json;
     struct ip_container *ip_list;   // list of all IP containers
     struct topic *topic_list;       // list of all topics
 };

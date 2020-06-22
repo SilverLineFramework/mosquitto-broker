@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', function() {
             selector: 'edge',
             style: {
                 'label': 'data(label)',
-                "font-size": 3,
+                "font-size": 3.5,
                 'width': 1.0,
                 'arrow-scale': 0.5,
                 'font-family' : 'Courier',
