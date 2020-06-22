@@ -4,22 +4,22 @@ import time, random, string
 def rand_str(N):
     return ''.join(random.choice(string.ascii_lowercase+string.digits) for i in range(N))
 
-brokers = ["127.0.0.1", "192.168.0.32", "Edwards-MacBook-Air.local"]
-port = 9001
+brokers = ["spatial.andrew.cmu.edu", "127.0.0.1", "192.168.0.32", "Edwards-MacBook-Air.local"]
+port = 9000
 
 client1 = mqtt.Client("client_py_"+rand_str(5), clean_session=True, transport="websockets")
-client2 = mqtt.Client("client_py_"+rand_str(5), clean_session=True)
-client3 = mqtt.Client("client_py_"+rand_str(5), clean_session=True)
+client2 = mqtt.Client("client_py_"+rand_str(5), clean_session=True, transport="websockets")
+client3 = mqtt.Client("client_py_"+rand_str(5), clean_session=True, transport="websockets")
 
 clients = [client1, client2, client3]
 
 client1.connect(brokers[0], port)
 client1.loop_start()
 
-client2.connect(brokers[0], 1883)
+client2.connect(brokers[0], port)
 client2.loop_start()
 
-client3.connect(brokers[0], 1883)
+client3.connect(brokers[0], port)
 client3.loop_start()
 
 start_topic = "begin/start"

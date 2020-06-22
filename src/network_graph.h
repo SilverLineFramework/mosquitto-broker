@@ -55,6 +55,7 @@ struct network_graph {
 };
 
 int network_graph_init(void);
+int network_graph_free(void);
 int network_graph_add_client(struct mosquitto *context);
 int network_graph_add_subtopic(struct mosquitto *context, const char *topic);
 int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uint32_t payloadlen);

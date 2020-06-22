@@ -305,10 +305,10 @@ static int graph_add_topic(struct topic *topic) {
 static int graph_delete_topic_sub_edges(struct topic *topic) {
     struct sub_edge *curr = topic->sub_list, *temp;
     while (curr != NULL) {
-        temp = curr->next;
-        cJSON_Delete(curr->json);
-        mosquitto__free(curr);
-        curr = temp;
+        temp = curr;
+        curr =  curr->next;
+        cJSON_Delete(temp->json);
+        mosquitto__free(temp);
     }
     return 0;
 }
@@ -351,12 +351,11 @@ static int graph_add_sub_edge(struct topic *topic, struct sub_edge *sub_edge) {
     topic->sub_list = sub_edge;
     return 0;
 }
+
 /*
  * Deletes a sub edge from the sub list
  */
-static int graph_delete_sub_edge(struct topic *topic, struct client *client) {
-    struct sub_edge *sub_edge = find_sub_edge(topic, client);
-    if (sub_edge == NULL) return -1;
+static int graph_delete_sub(struct topic *topic, struct sub_edge *sub_edge) {
     if (topic->sub_list == sub_edge) {
         topic->sub_list = topic->sub_list->next;
     }
@@ -368,6 +367,16 @@ static int graph_delete_sub_edge(struct topic *topic, struct client *client) {
     }
     cJSON_Delete(sub_edge->json);
     mosquitto__free(sub_edge);
+    return 0;
+}
+
+/*
+ * Deletes a sub edge from the sub list
+ */
+static int graph_delete_sub_edge(struct topic *topic, struct client *client) {
+    struct sub_edge *sub_edge = find_sub_edge(topic, client);
+    if (sub_edge == NULL) return -1;
+    graph_delete_sub(topic, sub_edge);
     return 0;
 }
 
@@ -386,6 +395,11 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
     }
     cJSON_Delete(ip_cont->json);
     mosquitto__free(ip_cont);
+
+    // if (graph->ip_list == NULL) {
+    //     cJSON_Delete(graph->json);
+    //     mosquitto__free(graph);
+    // }
     return 0;
 }
 
@@ -437,6 +451,42 @@ int network_graph_init(void) {
     graph->ip_list = NULL;
     graph->topic_list = NULL;
     graph->json = cJSON_CreateArray();
+    return 0;
+}
+
+int network_graph_free(void) {
+    struct ip_container *ip_temp;
+    struct client *client, *client_temp;
+    struct topic *topic_temp;
+
+    while (graph->ip_list != NULL) {
+        client = graph->ip_list->client_list;
+        while (client != NULL) {
+            client_temp = client;
+            client = client->next;
+            if (client_temp->pub_topic != NULL) {
+                cJSON_Delete(client_temp->pub_json);
+            }
+            cJSON_Delete(client_temp->json);
+            mosquitto__free(client_temp);
+        }
+        ip_temp = graph->ip_list;
+        graph->ip_list = graph->ip_list->next;
+        cJSON_Delete(ip_temp->json);
+        mosquitto__free(ip_temp);
+    }
+
+    while (graph->topic_list != NULL) {
+        topic_temp = graph->topic_list;
+        graph->topic_list = graph->topic_list->next;
+        graph_delete_topic_sub_edges(topic_temp);
+        cJSON_Delete(topic_temp->json);
+        free(topic_temp->full_name);
+        mosquitto__free(topic_temp);
+    }
+
+    cJSON_Delete(graph->json);
+    mosquitto__free(graph);
     return 0;
 }
 
