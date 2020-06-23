@@ -60,8 +60,6 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 			break;
 		case CMD_CONNECT:
 			rc = handle__connect(db, context);
-			if (rc != MOSQ_ERR_PROTOCOL)
-				network_graph_add_client(context);
 			network_graph_pub(db);
 			break;
 		case CMD_DISCONNECT:
@@ -94,13 +92,6 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 			rc = MOSQ_ERR_PROTOCOL;
 			break;
 	}
-
-	// if (rc != MOSQ_ERR_PROTOCOL) {
-	// 	network_graph_pub(db);
-	// }
-	// else {
-	// 	log__printf(NULL, MOSQ_LOG_NOTICE, "protocol error!");
-	// }
 
 	return rc;
 }

@@ -31,6 +31,7 @@ Contributors:
 #include "tls_mosq.h"
 #include "util_mosq.h"
 #include "will_mosq.h"
+#include "network_graph.h"
 
 #ifdef WITH_WEBSOCKETS
 #  include <libwebsockets.h>
@@ -197,6 +198,7 @@ int connect__on_authorised(struct mosquitto_db *db, struct mosquitto *context, v
 						context->address, context->id, context->protocol, context->clean_start, context->keepalive);
 			}
 		}
+		network_graph_add_client(context);
 
 		if(context->will) {
 			log__printf(NULL, MOSQ_LOG_DEBUG, "Will message specified (%ld bytes) (r%d, q%d).",

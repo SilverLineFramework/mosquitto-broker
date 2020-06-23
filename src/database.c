@@ -4,12 +4,12 @@ Copyright (c) 2009-2020 Roger Light <roger@atchoo.org>
 All rights reserved. This program and the accompanying materials
 are made available under the terms of the Eclipse Public License v1.0
 and Eclipse Distribution License v1.0 which accompany this distribution.
- 
+
 The Eclipse Public License is available at
    http://www.eclipse.org/legal/epl-v10.html
 and the Eclipse Distribution License is available at
   http://www.eclipse.org/org/documents/edl-v10.php.
- 
+
 Contributors:
    Roger Light - initial implementation and documentation.
 */
@@ -26,6 +26,7 @@ Contributors:
 #include "sys_tree.h"
 #include "time_mosq.h"
 #include "util_mosq.h"
+#include "network_graph.h"
 
 static unsigned long max_inflight_bytes = 0;
 static int max_queued = 100;
@@ -1050,6 +1051,7 @@ int db__message_write(struct mosquitto_db *db, struct mosquitto *context)
 		switch(tail->state){
 			case mosq_ms_publish_qos0:
 				rc = send__publish(context, mid, topic, payloadlen, payload, qos, retain, retries, cmsg_props, store_props, expiry_interval);
+				network_graph_add_subtopic(context, topic);
 				if(rc == MOSQ_ERR_SUCCESS || rc == MOSQ_ERR_OVERSIZE_PACKET){
 					db__message_remove(db, &context->msgs_out, tail);
 				}else{
@@ -1059,6 +1061,7 @@ int db__message_write(struct mosquitto_db *db, struct mosquitto *context)
 
 			case mosq_ms_publish_qos1:
 				rc = send__publish(context, mid, topic, payloadlen, payload, qos, retain, retries, cmsg_props, store_props, expiry_interval);
+				network_graph_add_subtopic(context, topic);
 				if(rc == MOSQ_ERR_SUCCESS){
 					tail->timestamp = mosquitto_time();
 					tail->dup = 1; /* Any retry attempts are a duplicate. */
@@ -1072,6 +1075,7 @@ int db__message_write(struct mosquitto_db *db, struct mosquitto *context)
 
 			case mosq_ms_publish_qos2:
 				rc = send__publish(context, mid, topic, payloadlen, payload, qos, retain, retries, cmsg_props, store_props, expiry_interval);
+				network_graph_add_subtopic(context, topic);
 				if(rc == MOSQ_ERR_SUCCESS){
 					tail->timestamp = mosquitto_time();
 					tail->dup = 1; /* Any retry attempts are a duplicate. */

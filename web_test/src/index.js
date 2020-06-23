@@ -256,8 +256,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     clearInterval(clients[ip][client_id]["pub"]);
                 }
 
+                var pubmsg = "x".repeat(bps);
+                publish(clients[ip][client_id], topic_id, pubmsg);
                 clients[ip][client_id]["pub"] = setInterval(() => {
-                    publish(clients[ip][client_id], topic_id, "x".repeat(bps));
+                    publish(clients[ip][client_id], topic_id, pubmsg);
                 }, interval);
 
                 break;

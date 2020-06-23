@@ -33,6 +33,7 @@ struct network_graph *graph = NULL;
  * General purpose hash function
  */
 static unsigned long sdbm_hash(const char *str) {
+    if (str == NULL) return 0;
     unsigned long hash = -1, c;
     while((c = *str++)) {
         hash = c + (hash << 6) + (hash << 16) - hash;
@@ -77,7 +78,7 @@ static cJSON *create_ip_json(const char *address) {
  */
 static cJSON *create_edge_json(const char *node1, const char *node2) {
     cJSON *root, *data;
-    char buf[MAX_TOPIC_LEN];
+    char buf[2*MAX_TOPIC_LEN];
 
     strcpy(buf, node1);
     strcat(buf, "-");
@@ -504,21 +505,39 @@ int network_graph_add_client(struct mosquitto *context) {
 }
 
 /*
+ * Called after bridge connects
+ */
+int network_graph_add_bridge(struct mosquitto *context) {
+    struct ip_container *ip_cont;
+    if ((ip_cont = find_ip_container(context->bridge->addresses[context->bridge->cur_address].address)) == NULL) {
+        ip_cont = create_ip_container(context->bridge->addresses[context->bridge->cur_address].address);
+        graph_add_ip_container(ip_cont);
+    }
+
+    if (find_client(ip_cont, context->id) == NULL) {
+        graph_add_client(ip_cont, create_client(context->id, context->bridge->addresses[context->bridge->cur_address].address));
+    }
+
+    return 0;
+}
+
+/*
  * Called after client publishes to topic
  */
 int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uint32_t payloadlen) {
+    if (topic[0] == '$') return 0;
     struct ip_container *ip_cont;
     struct client *client;
     struct topic *topic_vert;
     unsigned long topic_hash = sdbm_hash(topic);
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
-        log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find ip!");
         goto lookup_error;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
-        log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find client!");
         goto lookup_error;
     }
 
@@ -559,7 +578,7 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
     return 0;
 
 lookup_error:
-    network_graph_cleanup();
+    // network_graph_cleanup();
     return -1;
 }
 
@@ -567,22 +586,25 @@ lookup_error:
  * Called after client subscribes to topic
  */
 int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
-    bool match;
+    if (topic[0] == '$') return 0;
+    bool match, match_found = false;
     struct ip_container *ip_cont;
     struct client *client;
     struct topic *topic_vert = graph->topic_list;
     struct sub_edge *sub_edge;
+    cJSON *data;
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
-        log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find ip!");
         goto lookup_error;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
-        log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find client!");
         goto lookup_error;
     }
 
+    // check if sub_edge already exists, if not, create sub_edge
     for (; topic_vert != NULL; topic_vert = topic_vert->next) {
         mosquitto_topic_matches_sub(topic, topic_vert->full_name, &match);
         if (match) {
@@ -591,13 +613,23 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
                 graph_add_sub_edge(topic_vert, sub_edge);
                 sub_edge->sub = client;
             }
+            match_found = true;
         }
     }
+
+    // if (!match_found && topic[0] == '$') {
+    //     topic_vert = create_topic(topic);
+    //     topic_vert->ref_cnt = -1; // $SYS topics should never be removed
+    //     graph_add_topic(topic_vert);
+    //     sub_edge = create_sub_edge(topic, context->id);
+    //     graph_add_sub_edge(topic_vert, sub_edge);
+    //     sub_edge->sub = client;
+    // }
 
     return 0;
 
 lookup_error:
-    network_graph_cleanup();
+    // network_graph_cleanup();
     return -1;
 }
 
@@ -611,12 +643,12 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
     struct topic *topic_vert = graph->topic_list;
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
-        log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find ip!");
         goto lookup_error;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
-        log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find client!");
         goto lookup_error;
     }
 
@@ -630,7 +662,7 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
     return 0;
 
 lookup_error:
-    network_graph_cleanup();
+    // network_graph_cleanup();
     return -1;
 }
 
@@ -643,17 +675,17 @@ int network_graph_delete_client(struct mosquitto *context) {
     struct topic *topic_vert;
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
-        log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find ip!");
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find ip!");
         goto lookup_error;
     }
 
     if ((client = find_client(ip_cont, context->id)) == NULL) {
-        log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not find client!");
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find client!");
         goto lookup_error;
     }
     else {
         if (graph_delete_client(ip_cont, client) < 0) {
-            log__printf(NULL, MOSQ_LOG_NOTICE, "ERROR: could not delete client!");
+            log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not delete client!");
             goto lookup_error;
         }
     }
@@ -661,7 +693,7 @@ int network_graph_delete_client(struct mosquitto *context) {
     return 0;
 
 lookup_error:
-    network_graph_cleanup();
+    // network_graph_cleanup();
     return -1;
 }
 

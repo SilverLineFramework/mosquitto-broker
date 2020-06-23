@@ -297,7 +297,7 @@ int handle__publish(struct mosquitto_db *db, struct mosquitto *context)
 	}
 
 	log__printf(NULL, MOSQ_LOG_DEBUG, "Received PUBLISH from %s (d%d, q%d, r%d, m%d, '%s', ... (%ld bytes))", context->id, dup, qos, retain, mid, topic, (long)payloadlen);
-	network_graph_add_pubtopic(context, topic, (uint64_t)payloadlen);
+	network_graph_add_pubtopic(context, topic, payloadlen);
 	if(qos > 0){
 		db__message_store_find(context, mid, &stored);
 	}
