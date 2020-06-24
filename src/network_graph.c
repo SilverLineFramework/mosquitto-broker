@@ -491,31 +491,24 @@ int network_graph_cleanup(void) {
  * Called after client connects
  */
 int network_graph_add_client(struct mosquitto *context) {
+    char *address, *id;
     struct ip_container *ip_cont;
-    if ((ip_cont = find_ip_container(context->address)) == NULL) {
-        ip_cont = create_ip_container(context->address);
+
+    if (context->is_bridge && context->bridge != NULL) {
+        address = context->bridge->addresses[context->bridge->cur_address].address;
+    }
+    else {
+        address = context->address;
+    }
+    id = context->id;
+
+    if ((ip_cont = find_ip_container(address)) == NULL) {
+        ip_cont = create_ip_container(address);
         graph_add_ip_container(ip_cont);
     }
 
-    if (find_client(ip_cont, context->id) == NULL) {
-        graph_add_client(ip_cont, create_client(context->id, context->address));
-    }
-
-    return 0;
-}
-
-/*
- * Called after bridge connects
- */
-int network_graph_add_bridge(struct mosquitto *context) {
-    struct ip_container *ip_cont;
-    if ((ip_cont = find_ip_container(context->bridge->addresses[context->bridge->cur_address].address)) == NULL) {
-        ip_cont = create_ip_container(context->bridge->addresses[context->bridge->cur_address].address);
-        graph_add_ip_container(ip_cont);
-    }
-
-    if (find_client(ip_cont, context->id) == NULL) {
-        graph_add_client(ip_cont, create_client(context->id, context->bridge->addresses[context->bridge->cur_address].address));
+    if (find_client(ip_cont, id) == NULL) {
+        graph_add_client(ip_cont, create_client(context->id, address));
     }
 
     return 0;
@@ -525,18 +518,27 @@ int network_graph_add_bridge(struct mosquitto *context) {
  * Called after client publishes to topic
  */
 int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uint32_t payloadlen) {
-    if (topic[0] == '$') return 0;
+    if (topic[0] == '$') return 0; // ignore $SYS/# topics
+    char *address, *id;
     struct ip_container *ip_cont;
     struct client *client;
     struct topic *topic_vert;
     unsigned long topic_hash = sdbm_hash(topic);
 
-    if ((ip_cont = find_ip_container(context->address)) == NULL) {
+    if (context->is_bridge && context->bridge != NULL) {
+        address = context->bridge->addresses[context->bridge->cur_address].address;
+    }
+    else {
+        address = context->address; // id is null
+    }
+    id = context->id;
+
+    if ((ip_cont = find_ip_container(address)) == NULL) {
         log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find ip!");
         goto lookup_error;
     }
 
-    if ((client = find_client(ip_cont, context->id)) == NULL) {
+    if ((client = find_client(ip_cont, id)) == NULL) {
         log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find client!");
         goto lookup_error;
     }
@@ -572,7 +574,7 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
     }
 
     cJSON_Delete(client->pub_json);
-    client->pub_json = create_edge_json(context->id, topic);
+    client->pub_json = create_edge_json(id, topic);
     client->pub_topic = topic_vert;
 
     return 0;
@@ -588,18 +590,27 @@ lookup_error:
 int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
     if (topic[0] == '$') return 0;
     bool match, match_found = false;
+    char *address, *id;
     struct ip_container *ip_cont;
     struct client *client;
     struct topic *topic_vert = graph->topic_list;
     struct sub_edge *sub_edge;
     cJSON *data;
 
-    if ((ip_cont = find_ip_container(context->address)) == NULL) {
+    if (context->is_bridge && context->bridge != NULL) {
+        address = context->bridge->addresses[context->bridge->cur_address].address;
+    }
+    else {
+        address = context->address; // id is null
+    }
+    id = context->id;
+
+    if ((ip_cont = find_ip_container(address)) == NULL) {
         log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find ip!");
         goto lookup_error;
     }
 
-    if ((client = find_client(ip_cont, context->id)) == NULL) {
+    if ((client = find_client(ip_cont, id)) == NULL) {
         log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find client!");
         goto lookup_error;
     }
@@ -609,7 +620,7 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
         mosquitto_topic_matches_sub(topic, topic_vert->full_name, &match);
         if (match) {
             if (find_sub_edge(topic_vert, client) == NULL) {
-                sub_edge = create_sub_edge(topic_vert->full_name, context->id);
+                sub_edge = create_sub_edge(topic_vert->full_name, id);
                 graph_add_sub_edge(topic_vert, sub_edge);
                 sub_edge->sub = client;
             }
@@ -621,7 +632,7 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
     //     topic_vert = create_topic(topic);
     //     topic_vert->ref_cnt = -1; // $SYS topics should never be removed
     //     graph_add_topic(topic_vert);
-    //     sub_edge = create_sub_edge(topic, context->id);
+    //     sub_edge = create_sub_edge(topic, id);
     //     graph_add_sub_edge(topic_vert, sub_edge);
     //     sub_edge->sub = client;
     // }

@@ -406,10 +406,11 @@ int bridge__connect(struct mosquitto_db *db, struct mosquitto *context)
 
 	HASH_ADD(hh_sock, db->contexts_by_sock, sock, sizeof(context->sock), context);
 
+	network_graph_add_client(context);
+	network_graph_pub(db);
+
 	rc2 = send__connect(context, context->keepalive, context->clean_start, NULL);
 	if(rc2 == MOSQ_ERR_SUCCESS){
-		network_graph_add_bridge(context);
-		network_graph_pub(db);
 		bridge__backoff_reset(context);
 		return rc;
 	}else if(rc2 == MOSQ_ERR_ERRNO && errno == ENOTCONN){
