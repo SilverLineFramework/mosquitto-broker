@@ -7,53 +7,55 @@ def rand_str(N):
 broker = "spatial.andrew.cmu.edu"
 port = 9000
 
-client1 = mqtt.Client("client_py_"+rand_str(5), clean_session=True, transport="websockets")
-client2 = mqtt.Client("client_py_"+rand_str(5), clean_session=True, transport="websockets")
-client3 = mqtt.Client("client_py_"+rand_str(5), clean_session=True, transport="websockets")
+clients = []
 
-clients = [client1, client2, client3]
-
-client1.connect(broker, port)
-client1.loop_start()
-
-client2.connect(broker, port)
-client2.loop_start()
-
-client3.connect(broker, port)
-client3.loop_start()
-
-start_topic = "begin/start"
-
-client3.publish(start_topic, rand_str(random.randint(10,50)), retain=False)
-client3.subscribe(start_topic, 1)
+start_topic = "initial/topic"
 
 pub_topics = [start_topic]
 sub_topics = [start_topic]
+shared_topics = ["topic/shared1", "topic/shared2", "topic/shared3", "topic/shared4", "topic/shared5"]
 
 while False == False:
-    client = random.choice(clients)
     num = random.randint(0, 100)
 
-    if num <= 40:
+    if len(clients) < 10 or num <= 30: # connect
+        new_client = mqtt.Client("client_py_"+rand_str(5), clean_session=True, transport="websockets")
+        print "added new client"
+        new_client.connect(broker, port)
+        new_client.loop_start()
+        clients += [new_client]
+
+    elif len(clients) >= 10 and num <= 40: # disconnect
+        client = random.choice(clients)
+        print "disconnected client"
+        client.disconnect()
+        client.loop_stop()
+        clients.remove(client)
+
+    elif len(clients) > 0 and num <= 60: # pub
+        client = random.choice(clients)
         topic = ""
         for _ in range(random.randint(1,3)):
             topic += rand_str(random.randint(2,7)) + "/"
         topic += rand_str(2)
         pub_topics += [topic]
         print "pubbed to", topic
-        client.publish(topic, rand_str(random.randint(10,50)), retain=False)
+        client.publish(topic, rand_str(random.randint(10,100)), retain=False)
 
-    elif num <= 70 and len(sub_topics) > 0:
-        topic = random.choice(sub_topics)
-        print "unsubbed to", topic
-        client.unsubscribe(topic)
-        sub_topics.remove(topic)
-
-    elif num <= 100:
+    elif len(clients) > 0 and num <= 80: # sub
+        client = random.choice(clients)
         qos = random.randint(0,2)
         topic = random.choice(pub_topics)
         print "subbed to", topic
         client.subscribe(topic, qos)
         sub_topics += [topic]
+
+    elif len(clients) > 0 and len(sub_topics) > 0 and num <= 100: # unsub
+        client = random.choice(clients)
+        topic = random.choice(random.choice([shared_topics, sub_topics]))
+        print "unsubbed to", topic
+        client.unsubscribe(topic)
+        if topic not in shared_topics:
+            sub_topics.remove(topic)
 
     time.sleep(1)

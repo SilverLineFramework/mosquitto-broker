@@ -14,7 +14,7 @@
 
 #define MAX_TOPIC_LEN   32767
 #define BUFLEN          100
-#define PUB_DEL_TIMEOUT 20
+#define TOPIC_TIMEOUT   20      // seconds
 
 // Useful constants //
 const char s[2] = "/";
@@ -86,6 +86,7 @@ static cJSON *create_edge_json(const char *node1, const char *node2) {
 
     root = create_generic_json(buf);
     data = cJSON_GetObjectItem(root, "data");
+    cJSON_SetValuestring(cJSON_GetObjectItem(data, "label"), "...");
 
     cJSON_AddItemToObject(data, "source", cJSON_CreateString(node1));
     cJSON_AddItemToObject(data, "target", cJSON_CreateString(node2));
@@ -429,7 +430,7 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
     if (client->pub_topic != NULL) {
         --client->pub_topic->ref_cnt;
         if (client->pub_topic->ref_cnt == 0) {
-            client->pub_topic->timeout = PUB_DEL_TIMEOUT;
+            client->pub_topic->timeout = TOPIC_TIMEOUT;
             // graph_delete_topic(client->pub_topic);
         }
     }
@@ -529,7 +530,7 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
         address = context->bridge->addresses[context->bridge->cur_address].address;
     }
     else {
-        address = context->address; // id is null
+        address = context->address;
     }
     id = context->id;
 
@@ -558,7 +559,7 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
             // unpublish to old topic
             --client->pub_topic->ref_cnt;
             if (client->pub_topic->ref_cnt == 0) {
-                client->pub_topic->timeout = PUB_DEL_TIMEOUT;
+                client->pub_topic->timeout = TOPIC_TIMEOUT;
                 // graph_delete_topic(client->pub_topic);
             }
 
@@ -741,7 +742,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
     if (interval && now - interval > last_update) {
         while (topic != NULL) {
             topic->timeout -= (long)(now - last_update); // update timeout
-            if (topic->ref_cnt == 0 && topic->timeout <= 0) { // delete topic if timeout is 0
+            if (topic->ref_cnt == 0 && topic->timeout <= 0) { // delete topic if timeout < 0
                 temp = topic;
                 topic = topic->next;
                 graph_delete_topic(temp);
@@ -753,15 +754,21 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                 // update incoming bytes/s to topic
                 temp_bytes = (double)topic->total_bytes / (now - last_update);
                 topic->total_bytes = 0;
-                for (; sub_edge != NULL; sub_edge = sub_edge->next) {
-                    // update incoming bytes/s to client
-                    if (fabs(temp_bytes - topic->bytes_per_sec) > 0.01) {
-                        topic->bytes_per_sec = temp_bytes;
-                        snprintf(buf, BUFLEN, "%.2f bytes/s", topic->bytes_per_sec);
+
+                // update incoming bytes/s to client
+                if (fabs(temp_bytes - topic->bytes_per_sec) > 0.01) {
+                    topic->bytes_per_sec = temp_bytes;
+                    snprintf(buf, BUFLEN, "%.2f bytes/s", topic->bytes_per_sec);
+                    for (; sub_edge != NULL; sub_edge = sub_edge->next) {
                         data = cJSON_GetObjectItem(sub_edge->json, "data");
                         cJSON_SetValuestring(cJSON_GetObjectItem(data, "label"), buf);
+                        cJSON_AddItemToArray(graph->json, sub_edge->json);
                     }
-                    cJSON_AddItemToArray(graph->json, sub_edge->json);
+                }
+                else {
+                    for (; sub_edge != NULL; sub_edge = sub_edge->next) {
+                        cJSON_AddItemToArray(graph->json, sub_edge->json);
+                    }
                 }
                 topic = topic->next;
             }
@@ -833,7 +840,7 @@ void network_graph_pub(struct mosquitto_db *db) {
 
     // publish json to $SYS/graph topic
     json_buf = cJSON_Print(graph->json);
-    db__messages_easy_queue(db, NULL, "$SYS/graph", 2, strlen(json_buf), json_buf, 1, 10, NULL);
+    db__messages_easy_queue(db, NULL, "$SYS/graph", 2, strlen(json_buf), json_buf, 1, 30, NULL);
     free(json_buf);
     unlink_json();
 }
