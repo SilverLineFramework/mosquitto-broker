@@ -62,16 +62,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }]
     });
 
-    const ip_main = "localhost";//"spatial.andrew.cmu.edu";
+    const ip_main = "spatial.andrew.cmu.edu";
     const port = 9000;
     const client_main = new Paho.MQTT.Client(`ws://${ip_main}:${port}/`, "client_js_" + new Date().getTime());
     const graph_topic = "$SYS/graph";
 
+    let prevJSON = [];
+
     let action = null;
-    let oldJSON = null;
 
     let modal = document.getElementById("modalView");
-    let span = document.getElementsByClassName("close")[0];
+    let actions = document.getElementById("actions");
+    let span = document.querySelector(".close");
+
+    let spinner = document.querySelector(".refreshSpinner");
+    let uptodate = document.getElementById("uptodate")
 
     let ipElem = document.getElementById("ipDiv");
     let clientElem = document.getElementById("clientDiv");
@@ -95,7 +100,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (responseObject.errorCode !== 0) {
             console.log("onConnectionLost:" + responseObject.errorMessage);
         }
-        client_main.connect({ onSuccess: onConnect });
+        spinner.style.display = "none";
+        uptodate.style.display = "block";
+        uptodate.innerText = "Connecton lost. Refresh to try again.";
+        // client_main.connect({ onSuccess: onConnect });
     }
 
     function publish(client, dest, msg) {
@@ -123,18 +131,23 @@ document.addEventListener('DOMContentLoaded', function() {
     function onMessageArrived(message) {
         var newJSON = JSON.parse(message.payloadString);
         msgText.value = JSON.stringify(newJSON, undefined, 4);
-        // console.log(msgText.value);
 
         try {
-            cy.json({ elements: newJSON });
-            if (!_.isEqual(oldJSON, newJSON)) {
+            if (newJSON != undefined) {
+                cy.json({ elements: newJSON });
                 runLayout();
+                prevJSON.push(newJSON);
             }
+            spinner.style.display = "none";
+            uptodate.style.display = "block";
+            setTimeout(() => {
+                spinner.style.display = "block";
+                uptodate.style.display = "none";
+            }, 1500);
         }
         catch (err) {
             console.log(err.message)
         }
-        oldJSON = newJSON;
     }
 
     cy.on("tap", "node", function(event) {
@@ -247,6 +260,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 clients[ip][client_id] = new Paho.MQTT.Client(`ws://${ip}:${port}/`, client_id);
                 clients[ip][client_id].connect();
+                actions.innerText = `Connected client ${client_id}!`;
                 break;
             case "Publish":
                 if (clients[ip] == undefined || clients[ip][client_id] == undefined ||
@@ -261,19 +275,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 clients[ip][client_id]["pub"] = setInterval(() => {
                     publish(clients[ip][client_id], topic_id, pubmsg);
                 }, interval);
-
+                actions.innerText = `Client ${client_id} published to ${topic_id}!`;
                 break;
             case "Subscribe":
                 if (clients[ip] == undefined || clients[ip][client_id] == undefined ||
                     topic_id == "") break;
 
                 clients[ip][client_id].subscribe(topic_id);
+                actions.innerText = `Client ${client_id} subscribed to ${topic_id}!`;
                 break;
             case "Unsubscribe":
                 if (clients[ip] == undefined || clients[ip][client_id] == undefined ||
                     topic_id == "") break;
 
                 clients[ip][client_id].unsubscribe(topic_id);
+                actions.innerText = `Client ${client_id} unsubscribed to ${topic_id}!`;
                 break;
             case "Disconnect":
                 if (clients[ip] == undefined ||
@@ -285,11 +301,10 @@ document.addEventListener('DOMContentLoaded', function() {
 
                 clients[ip][client_id].disconnect();
                 delete clients[ip][client_id];
+                actions.innerText = `Disconnected client ${client_id}!`;
                 break;
             default:
                 break;
         }
-        // console.log(client_id, topic_id, action);
-        // console.log(clients);
     }
 });
