@@ -1051,7 +1051,6 @@ int db__message_write(struct mosquitto_db *db, struct mosquitto *context)
 		switch(tail->state){
 			case mosq_ms_publish_qos0:
 				rc = send__publish(context, mid, topic, payloadlen, payload, qos, retain, retries, cmsg_props, store_props, expiry_interval);
-				network_graph_add_subtopic(context, topic);
 				if(rc == MOSQ_ERR_SUCCESS || rc == MOSQ_ERR_OVERSIZE_PACKET){
 					db__message_remove(db, &context->msgs_out, tail);
 				}else{
@@ -1061,7 +1060,6 @@ int db__message_write(struct mosquitto_db *db, struct mosquitto *context)
 
 			case mosq_ms_publish_qos1:
 				rc = send__publish(context, mid, topic, payloadlen, payload, qos, retain, retries, cmsg_props, store_props, expiry_interval);
-				network_graph_add_subtopic(context, topic);
 				if(rc == MOSQ_ERR_SUCCESS){
 					tail->timestamp = mosquitto_time();
 					tail->dup = 1; /* Any retry attempts are a duplicate. */
@@ -1075,7 +1073,6 @@ int db__message_write(struct mosquitto_db *db, struct mosquitto *context)
 
 			case mosq_ms_publish_qos2:
 				rc = send__publish(context, mid, topic, payloadlen, payload, qos, retain, retries, cmsg_props, store_props, expiry_interval);
-				network_graph_add_subtopic(context, topic);
 				if(rc == MOSQ_ERR_SUCCESS){
 					tail->timestamp = mosquitto_time();
 					tail->dup = 1; /* Any retry attempts are a duplicate. */

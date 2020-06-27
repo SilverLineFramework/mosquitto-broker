@@ -308,7 +308,7 @@ static struct topic *find_pub_topic(const char *topic) {
 static struct sub_edge *find_sub_edge(struct topic *topic, struct client *client) {
     struct sub_edge *curr = topic->sub_list;
     for (; curr != NULL; curr = curr->next) {
-        if (client == curr->sub) {
+        if (curr->sub == client) {
             return curr;
         }
     }
@@ -748,8 +748,8 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
             if (match) {
                 if (find_sub_edge(topic_vert, client) == NULL) {
                     sub_edge = create_sub_edge(topic_vert->full_name, id);
-                    graph_add_sub_edge(topic_vert, sub_edge);
                     sub_edge->sub = client;
+                    graph_add_sub_edge(topic_vert, sub_edge);
                 }
                 match_found = true;
             }
@@ -792,8 +792,7 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
     }
 
     for(size_t i = 0; i < graph->topic_dict->max_size; ++i) {
-        if ((topic_vert = graph->topic_dict->topic_list[i]) == NULL) continue;
-
+        topic_vert = graph->topic_dict->topic_list[i];
         for (; topic_vert != NULL; topic_vert = topic_vert->next) {
             mosquitto_topic_matches_sub(topic, topic_vert->full_name, &match);
             if (match) {
@@ -884,14 +883,15 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                 }
                 else {
                     cJSON_AddItemToArray(graph->json, topic->json);
-                    sub_edge = topic->sub_list;
 
                     // update incoming bytes/s to topic
                     temp_bytes = (double)topic->total_bytes / (now - last_update);
                     topic->total_bytes = 0;
 
                     topic->bytes_per_sec = temp_bytes;
+                    sub_edge = topic->sub_list;
                     snprintf(buf, BUFLEN, "%.2f bytes/s", topic->bytes_per_sec);
+
                     // each topic has a list of subscribed clients
                     for (; sub_edge != NULL; sub_edge = sub_edge->next) {
                         // update outgoing bytes/s from topic
