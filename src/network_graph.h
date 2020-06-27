@@ -48,10 +48,22 @@ struct ip_container {
     unsigned long hash;         // hash(IP)
 };
 
+struct ip_dict {
+    size_t used;
+    size_t max_size;
+    struct ip_container **ip_list;  // list of all ip addresses
+};
+
+struct topic_dict {
+    size_t used;
+    size_t max_size;
+    struct topic **topic_list;      // list of all topics
+};
+
 struct network_graph {
     cJSON *json;
-    struct ip_container *ip_list;   // list of all IP containers
-    struct topic *topic_list;       // list of all topics
+    struct ip_dict *ip_dict;
+    struct topic_dict *topic_dict;
 };
 
 int network_graph_init(void);

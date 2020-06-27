@@ -12,7 +12,7 @@
 #include "sys_tree.h"
 #include "network_graph.h"
 
-#define MAX_TOPIC_LEN   32767
+// #define MAX_TOPIC_LEN   32767
 #define BUFLEN          100
 #define TOPIC_TIMEOUT   20      // seconds
 
@@ -201,8 +201,9 @@ static struct sub_edge *create_sub_edge(const char *src, const char *tgt) {
  * Searches for an IP container given an address
  */
 static struct ip_container *find_ip_container(const char *address) {
-    unsigned long hash = sdbm_hash(address);
-    struct ip_container *ip_cont = graph->ip_list;
+    unsigned long hash = sdbm_hash(address),
+                   idx = hash % graph->ip_dict->max_size;
+    struct ip_container *ip_cont = graph->ip_dict->ip_list[idx];
     for (; ip_cont != NULL; ip_cont = ip_cont->next) {
         if (hash == ip_cont->hash) {
             return ip_cont;
@@ -212,14 +213,52 @@ static struct ip_container *find_ip_container(const char *address) {
 }
 
 /*
+ * Change the size of the ip hash table
+ */
+static int graph_set_ip_dict_size(unsigned int new_size) {
+    size_t idx;
+    struct ip_container **ip_list_copy, *temp;
+    ip_list_copy = graph->ip_dict->ip_list;
+    graph->ip_dict->ip_list = (struct ip_container **)mosquitto__calloc(new_size, sizeof(struct ip_container *));
+    if (graph->ip_dict->ip_list == NULL) return -1;
+
+    // rehash all elems of old dict and place them in new dict
+    for (size_t i = 0; i < graph->ip_dict->max_size; ++i) {
+        while (ip_list_copy[i] != NULL) {
+            temp = ip_list_copy[i];
+            ip_list_copy[i] = ip_list_copy[i]->next;
+            idx = temp->hash % new_size;
+            temp->prev = NULL;
+            temp->next = graph->ip_dict->ip_list[idx];
+            if (graph->ip_dict->ip_list[idx] != NULL) {
+                graph->ip_dict->ip_list[idx]->prev = temp;
+            }
+            graph->ip_dict->ip_list[idx] = temp;
+        }
+    }
+    graph->ip_dict->max_size = new_size;
+
+    mosquitto__free(ip_list_copy);
+
+    return 0;
+}
+
+/*
  * Adds an IP container to the network graph
  */
 static int graph_add_ip_container(struct ip_container *ip_cont) {
-    ip_cont->next = graph->ip_list;
-    if (graph->ip_list != NULL) {
-        graph->ip_list->prev = ip_cont;
+    size_t idx;
+    if (graph->ip_dict->used == graph->ip_dict->max_size) {
+        graph_set_ip_dict_size(graph->ip_dict->max_size * 2);
     }
-    graph->ip_list = ip_cont;
+
+    idx = ip_cont->hash % graph->ip_dict->max_size;
+    ip_cont->next = graph->ip_dict->ip_list[idx];
+    if (graph->ip_dict->ip_list[idx] != NULL) {
+        graph->ip_dict->ip_list[idx]->prev = ip_cont;
+    }
+    graph->ip_dict->ip_list[idx] = ip_cont;
+    ++graph->ip_dict->used;
     return 0;
 }
 
@@ -253,8 +292,8 @@ static int graph_add_client(struct ip_container *ip_cont, struct client *client)
  * Searches for a published topic
  */
 static struct topic *find_pub_topic(const char *topic) {
-    unsigned long hash = sdbm_hash(topic);
-    struct topic *curr = graph->topic_list;
+    unsigned long hash = sdbm_hash(topic), idx = hash % graph->topic_dict->max_size;
+    struct topic *curr = graph->topic_dict->topic_list[idx];
     for (; curr != NULL; curr = curr->next) {
         if (hash == curr->hash) {
             return curr;
@@ -281,25 +320,66 @@ static struct sub_edge *find_sub_edge(struct topic *topic, struct client *client
  */
 static struct topic *find_sub_topic(const char *topic) {
     bool match;
-    struct topic *curr = graph->topic_list;
-    for (; curr != NULL; curr = curr->next) {
-        mosquitto_topic_matches_sub(topic, curr->full_name, &match);
-        if (match) {
-            return curr;
+    struct topic *curr;
+    for (size_t i = 0; i < graph->topic_dict->max_size; ++i) {
+        curr = graph->topic_dict->topic_list[i];
+        for (; curr != NULL; curr = curr->next) {
+            mosquitto_topic_matches_sub(topic, curr->full_name, &match);
+            if (match) {
+                return curr;
+            }
         }
     }
     return NULL;
 }
 
 /*
+ * Change the size of the topic hash table
+ */
+static int graph_set_topic_dict_size(unsigned int new_size) {
+    size_t idx;
+    struct topic **topic_list_copy, *temp;
+    topic_list_copy = graph->topic_dict->topic_list;
+    graph->topic_dict->topic_list = (struct topic **)mosquitto__calloc(new_size, sizeof(struct topic *));
+    if (graph->topic_dict->topic_list == NULL) return -1;
+
+    // rehash all elems of old dict and place them in new dict
+    for (size_t i = 0; i < graph->topic_dict->max_size; ++i) {
+        while (topic_list_copy[i] != NULL) {
+            temp = topic_list_copy[i];
+            topic_list_copy[i] = topic_list_copy[i]->next;
+            idx = temp->hash % new_size;
+            temp->prev = NULL;
+            temp->next = graph->topic_dict->topic_list[idx];
+            if (graph->topic_dict->topic_list[idx] != NULL) {
+                graph->topic_dict->topic_list[idx]->prev = temp;
+            }
+            graph->topic_dict->topic_list[idx] = temp;
+        }
+    }
+    graph->topic_dict->max_size = new_size;
+
+    mosquitto__free(topic_list_copy);
+
+    return 0;
+}
+
+/*
  * Adds a topic to the topic list
  */
 static int graph_add_topic(struct topic *topic) {
-    topic->next = graph->topic_list;
-    if (graph->topic_list != NULL) {
-        graph->topic_list->prev = topic;
+    size_t idx;
+    if (graph->topic_dict->used == graph->topic_dict->max_size) {
+        graph_set_topic_dict_size(graph->topic_dict->max_size * 2);
     }
-    graph->topic_list = topic;
+
+    idx = topic->hash % graph->topic_dict->max_size;
+    topic->next = graph->topic_dict->topic_list[idx];
+    if (graph->topic_dict->topic_list[idx] != NULL) {
+        graph->topic_dict->topic_list[idx]->prev = topic;
+    }
+    graph->topic_dict->topic_list[idx] = topic;
+    ++graph->topic_dict->used;
     return 0;
 }
 
@@ -321,8 +401,9 @@ static int graph_delete_topic_sub_edges(struct topic *topic) {
  * Detaches a topic from the topic list
  */
 static inline void graph_detach_topic(struct topic *topic) {
-    if (graph->topic_list == topic) {
-        graph->topic_list = graph->topic_list->next;
+    size_t idx = topic->hash % graph->topic_dict->max_size;
+    if (graph->topic_dict->topic_list[idx] == topic) {
+        graph->topic_dict->topic_list[idx] = graph->topic_dict->topic_list[idx]->next;
     }
     if (topic->next != NULL) {
         topic->next->prev = topic->prev;
@@ -341,6 +422,11 @@ static int graph_delete_topic(struct topic *topic) {
     cJSON_Delete(topic->json);
     mosquitto__free(topic->full_name);
     mosquitto__free(topic);
+
+    if (graph->topic_dict->used < graph->topic_dict->max_size / 4) {
+        graph_set_topic_dict_size(graph->topic_dict->max_size / 2);
+    }
+    --graph->topic_dict->used;
     return 0;
 }
 
@@ -388,8 +474,11 @@ static int graph_delete_sub_edge(struct topic *topic, struct client *client) {
  * Deletes an IP container
  */
 static int graph_delete_ip(struct ip_container *ip_cont) {
-    if (graph->ip_list == ip_cont) {
-        graph->ip_list = graph->ip_list->next;
+    size_t idx;
+
+    idx = ip_cont->hash % graph->ip_dict->max_size;
+    if (graph->ip_dict->ip_list[idx] == ip_cont) {
+        graph->ip_dict->ip_list[idx] = graph->ip_dict->ip_list[idx]->next;
     }
     if (ip_cont->next != NULL) {
         ip_cont->next->prev = ip_cont->prev;
@@ -400,6 +489,10 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
     cJSON_Delete(ip_cont->json);
     mosquitto__free(ip_cont);
 
+    if (graph->ip_dict->used < graph->ip_dict->max_size / 4) {
+        graph_set_ip_dict_size(graph->ip_dict->max_size / 2);
+    }
+    --graph->ip_dict->used;
     return 0;
 }
 
@@ -407,6 +500,7 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
  * Delete a client
  */
 static int graph_delete_client(struct ip_container *ip_cont, struct client *client) {
+    struct topic *curr;
     if (ip_cont->client_list == client) {
         ip_cont->client_list = ip_cont->client_list->next;
     }
@@ -423,9 +517,11 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
     }
 
     // unlink client from all subbed topics
-    struct topic *topic = graph->topic_list;
-    for (; topic != NULL; topic = topic->next) {
-        graph_delete_sub_edge(topic, client);
+    for (size_t i = 0; i < graph->topic_dict->max_size; ++i) {
+        curr = graph->topic_dict->topic_list[i];
+        for (; curr != NULL; curr = curr->next) {
+            graph_delete_sub_edge(curr, client);
+        }
     }
 
     // if topic is only one pubbed, delete topic by setting timeout
@@ -448,44 +544,70 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
 int network_graph_init(void) {
     graph = (struct network_graph *)mosquitto__malloc(sizeof(struct network_graph));
     if (!graph) return -1;
-    graph->ip_list = NULL;
-    graph->topic_list = NULL;
+
+    graph->ip_dict = (struct ip_dict *)mosquitto__malloc(sizeof(struct ip_dict));
+    if (!graph->ip_dict) return -1;
+    graph->ip_dict->ip_list = (struct ip_container **)mosquitto__calloc(1, sizeof(struct ip_container *));
+    if (!graph->ip_dict->ip_list) return -1;
+    graph->ip_dict->max_size = 1;
+    graph->ip_dict->used = 0;
+
+    graph->topic_dict = (struct topic_dict *)mosquitto__malloc(sizeof(struct topic_dict));
+    if (!graph->topic_dict) return -1;
+    graph->topic_dict->topic_list = (struct topic **)mosquitto__calloc(1, sizeof(struct topic *));
+    if (!graph->topic_dict->topic_list) return -1;
+    graph->topic_dict->max_size = 1;
+    graph->topic_dict->used = 0;
+
     graph->json = cJSON_CreateArray();
+
     return 0;
 }
 
 int network_graph_cleanup(void) {
-    struct ip_container *ip_temp;
+    struct ip_container *ip_curr, *ip_temp;
     struct client *client, *client_temp;
-    struct topic *topic_temp;
+    struct topic *topic_curr, *topic_temp;
 
-    while (graph->ip_list != NULL) {
-        client = graph->ip_list->client_list;
-        while (client != NULL) {
-            client_temp = client;
-            client = client->next;
-            if (client_temp->pub_topic != NULL) {
-                cJSON_Delete(client_temp->pub_json);
+    for(size_t i = 0; i < graph->ip_dict->max_size; ++i) {
+        if ((ip_curr = graph->ip_dict->ip_list[i]) == NULL) continue;
+
+        while (ip_curr != NULL) {
+            client = ip_curr->client_list;
+            while (client != NULL) {
+                client_temp = client;
+                client = client->next;
+                if (client_temp->pub_topic != NULL) {
+                    cJSON_Delete(client_temp->pub_json);
+                }
+                cJSON_Delete(client_temp->json);
+                mosquitto__free(client_temp);
             }
-            cJSON_Delete(client_temp->json);
-            mosquitto__free(client_temp);
+            ip_temp = ip_curr;
+            ip_curr = ip_curr->next;
+            cJSON_Delete(ip_temp->json);
+            mosquitto__free(ip_temp);
         }
-        ip_temp = graph->ip_list;
-        graph->ip_list = graph->ip_list->next;
-        cJSON_Delete(ip_temp->json);
-        mosquitto__free(ip_temp);
     }
 
-    while (graph->topic_list != NULL) {
-        topic_temp = graph->topic_list;
-        graph->topic_list = graph->topic_list->next;
-        graph_delete_topic_sub_edges(topic_temp);
-        cJSON_Delete(topic_temp->json);
-        free(topic_temp->full_name);
-        mosquitto__free(topic_temp);
+    for(size_t i = 0; i < graph->topic_dict->max_size; ++i) {
+        if ((topic_curr = graph->topic_dict->topic_list[i]) == NULL) continue;
+
+        while (topic_curr != NULL) {
+            topic_temp = topic_curr;
+            topic_curr = topic_curr->next;
+            graph_delete_topic_sub_edges(topic_temp);
+            cJSON_Delete(topic_temp->json);
+            free(topic_temp->full_name);
+            mosquitto__free(topic_temp);
+        }
     }
 
     cJSON_Delete(graph->json);
+    mosquitto__free(graph->ip_dict->ip_list);
+    mosquitto__free(graph->ip_dict);
+    mosquitto__free(graph->topic_dict->topic_list);
+    mosquitto__free(graph->topic_dict);
     mosquitto__free(graph);
     return 0;
 }
@@ -564,7 +686,6 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
                 client->pub_topic->timeout = TOPIC_TIMEOUT;
                 // graph_delete_topic(client->pub_topic);
             }
-
             // publish to new topic
             ++topic_vert->ref_cnt;
         }
@@ -596,7 +717,7 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
     char *address, *id;
     struct ip_container *ip_cont;
     struct client *client;
-    struct topic *topic_vert = graph->topic_list;
+    struct topic *topic_vert;
     struct sub_edge *sub_edge;
     cJSON *data;
 
@@ -619,15 +740,19 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
     }
 
     // check if sub_edge already exists, if not, create sub_edge
-    for (; topic_vert != NULL; topic_vert = topic_vert->next) {
-        mosquitto_topic_matches_sub(topic, topic_vert->full_name, &match);
-        if (match) {
-            if (find_sub_edge(topic_vert, client) == NULL) {
-                sub_edge = create_sub_edge(topic_vert->full_name, id);
-                graph_add_sub_edge(topic_vert, sub_edge);
-                sub_edge->sub = client;
+    for(size_t i = 0; i < graph->topic_dict->max_size; ++i) {
+        if ((topic_vert = graph->topic_dict->topic_list[i]) == NULL) continue;
+
+        for (; topic_vert != NULL; topic_vert = topic_vert->next) {
+            mosquitto_topic_matches_sub(topic, topic_vert->full_name, &match);
+            if (match) {
+                if (find_sub_edge(topic_vert, client) == NULL) {
+                    sub_edge = create_sub_edge(topic_vert->full_name, id);
+                    graph_add_sub_edge(topic_vert, sub_edge);
+                    sub_edge->sub = client;
+                }
+                match_found = true;
             }
-            match_found = true;
         }
     }
 
@@ -654,7 +779,7 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
     bool match;
     struct ip_container *ip_cont;
     struct client *client;
-    struct topic *topic_vert = graph->topic_list;
+    struct topic *topic_vert;
 
     if ((ip_cont = find_ip_container(context->address)) == NULL) {
         log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find ip!");
@@ -666,10 +791,14 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
         goto lookup_error;
     }
 
-    for (; topic_vert != NULL; topic_vert = topic_vert->next) {
-        mosquitto_topic_matches_sub(topic, topic_vert->full_name, &match);
-        if (match) {
-            graph_delete_sub_edge(topic_vert, client);
+    for(size_t i = 0; i < graph->topic_dict->max_size; ++i) {
+        if ((topic_vert = graph->topic_dict->topic_list[i]) == NULL) continue;
+
+        for (; topic_vert != NULL; topic_vert = topic_vert->next) {
+            mosquitto_topic_matches_sub(topic, topic_vert->full_name, &match);
+            if (match) {
+                graph_delete_sub_edge(topic_vert, client);
+            }
         }
     }
 
@@ -733,64 +862,73 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
 
     char *json_buf, buf[BUFLEN];
     cJSON *data;
-    struct ip_container *ip_cont = graph->ip_list;
+
+    struct ip_container *ip_cont;
     struct client *client;
     struct sub_edge *sub_edge;
-    struct topic *topic = graph->topic_list, *temp;
+    struct topic *topic, *temp;
 
     double temp_bytes;
     time_t now = mosquitto_time();
 
     if (interval && now - interval > last_update) {
-        while (topic != NULL) {
-            topic->timeout -= (long)(now - last_update); // update timeout
-            if (topic->ref_cnt == 0 && topic->timeout <= 0) { // delete topic if timeout < 0
-                temp = topic;
-                topic = topic->next;
-                graph_delete_topic(temp);
-            }
-            else {
-                cJSON_AddItemToArray(graph->json, topic->json);
-                sub_edge = topic->sub_list;
-
-                // update incoming bytes/s to topic
-                temp_bytes = (double)topic->total_bytes / (now - last_update);
-                topic->total_bytes = 0;
-
-                topic->bytes_per_sec = temp_bytes;
-                snprintf(buf, BUFLEN, "%.2f bytes/s", topic->bytes_per_sec);
-                for (; sub_edge != NULL; sub_edge = sub_edge->next) {
-                    // update outgoing bytes/s from topic
-                    data = cJSON_GetObjectItem(sub_edge->json, "data");
-                    cJSON_SetValuestring(cJSON_GetObjectItem(data, "label"), buf);
-                    cJSON_AddItemToArray(graph->json, sub_edge->json);
+        // graph has a list of all topics that are pubbed
+        for (size_t i = 0; i < graph->topic_dict->max_size; ++i) {
+            topic = graph->topic_dict->topic_list[i];
+            while (topic != NULL) {
+                topic->timeout -= (long)(now - last_update); // update timeout
+                if (topic->ref_cnt == 0 && topic->timeout <= 0) { // delete topic if timeout < 0
+                    temp = topic;
+                    topic = topic->next;
+                    graph_delete_topic(temp);
                 }
-                topic = topic->next;
+                else {
+                    cJSON_AddItemToArray(graph->json, topic->json);
+                    sub_edge = topic->sub_list;
+
+                    // update incoming bytes/s to topic
+                    temp_bytes = (double)topic->total_bytes / (now - last_update);
+                    topic->total_bytes = 0;
+
+                    topic->bytes_per_sec = temp_bytes;
+                    snprintf(buf, BUFLEN, "%.2f bytes/s", topic->bytes_per_sec);
+                    // each topic has a list of subscribed clients
+                    for (; sub_edge != NULL; sub_edge = sub_edge->next) {
+                        // update outgoing bytes/s from topic
+                        data = cJSON_GetObjectItem(sub_edge->json, "data");
+                        cJSON_SetValuestring(cJSON_GetObjectItem(data, "label"), buf);
+                        cJSON_AddItemToArray(graph->json, sub_edge->json);
+                    }
+                    topic = topic->next;
+                }
             }
         }
 
         // graph has a list of all IP addresses
-        for (; ip_cont != NULL; ip_cont = ip_cont->next) {
-            cJSON_AddItemToArray(graph->json, ip_cont->json);
-            client = ip_cont->client_list; // each IP address holds a list of clients
+        for (size_t i = 0; i < graph->ip_dict->max_size; ++i) {
+            ip_cont = graph->ip_dict->ip_list[i];
+            for (; ip_cont != NULL; ip_cont = ip_cont->next) {
+                cJSON_AddItemToArray(graph->json, ip_cont->json);
+                client = ip_cont->client_list; // each IP address holds a list of clients
 
-            for (; client != NULL; client = client->next) {
-                cJSON_AddItemToArray(graph->json, client->json);
-                if (client->pub_topic != NULL) { // client may have a published topic
-                    temp_bytes = (double)client->bytes_out / (now - last_update);
-                    client->bytes_out = 0;
+                for (; client != NULL; client = client->next) {
+                    cJSON_AddItemToArray(graph->json, client->json);
+                    if (client->pub_topic != NULL) { // client may have a published topic
+                        temp_bytes = (double)client->bytes_out / (now - last_update);
+                        client->bytes_out = 0;
 
-                    // update outgoing bytes/s from client
-                    client->bytes_out_per_sec = temp_bytes;
-                    snprintf(buf, BUFLEN, "%.2f bytes/s", client->bytes_out_per_sec);
-                    data = cJSON_GetObjectItem(client->pub_json, "data");
-                    cJSON_SetValuestring(cJSON_GetObjectItem(data, "label"), buf);
-                    cJSON_AddItemToArray(graph->json, client->pub_json);
+                        // update outgoing bytes/s from client
+                        client->bytes_out_per_sec = temp_bytes;
+                        snprintf(buf, BUFLEN, "%.2f bytes/s", client->bytes_out_per_sec);
+                        data = cJSON_GetObjectItem(client->pub_json, "data");
+                        cJSON_SetValuestring(cJSON_GetObjectItem(data, "label"), buf);
+                        cJSON_AddItemToArray(graph->json, client->pub_json);
+                    }
                 }
             }
         }
 
-        // send out the updated graph
+        // send out the updated graph to $SYS/graph topic
         json_buf = cJSON_Print(graph->json);
         db__messages_easy_queue(db, NULL, "$SYS/graph", 2, strlen(json_buf), json_buf, 1, 5, NULL);
         free(json_buf);
@@ -798,43 +936,4 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
 
         last_update = mosquitto_time();
     }
-}
-
-/*
- * Publishes network graph as JSON
- */
-void network_graph_pub(struct mosquitto_db *db) {
-    char *json_buf;
-    cJSON *elem, *temp;
-    struct ip_container *ip_cont = graph->ip_list;
-    struct client *client;
-    struct sub_edge *sub_edge;
-    struct topic *topic = graph->topic_list;
-
-    // graph has a list of all IP addresses
-    for (; ip_cont != NULL; ip_cont = ip_cont->next) {
-        cJSON_AddItemToArray(graph->json, ip_cont->json);
-        client = ip_cont->client_list; // each IP address holds a list of clients
-        for (; client != NULL; client = client->next) {
-            cJSON_AddItemToArray(graph->json, client->json);
-            if (client->pub_topic != NULL) { // client may have a published topic
-                cJSON_AddItemToArray(graph->json, client->pub_json);
-            }
-        }
-    }
-
-    // graph has a list of all topics that are pubbed
-    for (; topic != NULL; topic = topic->next) {
-        cJSON_AddItemToArray(graph->json, topic->json);
-        sub_edge = topic->sub_list; // each topic has a list of subscribed clients
-        for (; sub_edge != NULL; sub_edge = sub_edge->next) {
-            cJSON_AddItemToArray(graph->json, sub_edge->json);
-        }
-    }
-
-    // publish json to $SYS/graph topic
-    json_buf = cJSON_Print(graph->json);
-    db__messages_easy_queue(db, NULL, "$SYS/graph", 2, strlen(json_buf), json_buf, 1, 30, NULL);
-    free(json_buf);
-    unlink_json();
 }
