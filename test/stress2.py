@@ -18,31 +18,32 @@ shared_topics = ["topic/shared1", "topic/shared2", "topic/shared3", "topic/share
 while False == False:
     num = random.randint(0, 100)
 
-    if len(clients) < 10 or num <= 30: # connect
+    if len(clients) < 5: # connect
         new_client = mqtt.Client("client_py_"+rand_str(5), clean_session=True, transport="websockets")
         print "added new client"
         new_client.connect(broker, port)
         new_client.loop_start()
         clients += [new_client]
 
-    elif len(clients) >= 10 and num <= 40: # disconnect
+    elif len(clients) >= 10 and num <= 5: # disconnect
         client = random.choice(clients)
         print "disconnected client"
         client.disconnect()
         client.loop_stop()
         clients.remove(client)
 
-    elif len(clients) > 0 and num <= 60: # pub
+    elif len(clients) > 0 and num <= 40: # pub
         client = random.choice(clients)
         topic = ""
         for _ in range(random.randint(1,3)):
             topic += rand_str(random.randint(2,7)) + "/"
         topic += rand_str(2)
-        pub_topics += [topic]
-        print "pubbed to", topic
-        client.publish(topic, rand_str(random.randint(10,100)), retain=False)
+        pub_to = random.choice([random.choice(shared_topics), topic])
+        pub_topics += [pub_to]
+        print "pubbed to", pub_to
+        client.publish(pub_to, rand_str(random.randint(10,100)), retain=False)
 
-    elif len(clients) > 0 and num <= 80: # sub
+    elif len(clients) > 0 and num <= 70: # sub
         client = random.choice(clients)
         qos = random.randint(0,2)
         topic = random.choice(pub_topics)

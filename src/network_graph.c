@@ -14,11 +14,11 @@
 
 // #define MAX_TOPIC_LEN   32767
 #define BUFLEN          100
-#define TOPIC_TIMEOUT   20      // seconds
+#define TIMEOUT         20      // seconds
 
 // Useful constants //
 const char s[2] = "/";
-const char *ip_class = "client ip";
+const char *ip_class = "ip";
 const char *client_class = "client";
 const char *topic_class = "topic";
 const char *edge_class = "connections";
@@ -151,14 +151,10 @@ static struct client *create_client(const char *id, const char *address) {
     struct client *client = (struct client *)mosquitto__malloc(sizeof(struct client));
     if (!client) return NULL;
     client->json = create_client_json(id, address);
-    client->pub_json = NULL;
+    client->pub_list = NULL;
     client->next = NULL;
     client->prev = NULL;
-    client->pub_topic = NULL;
     client->hash = sdbm_hash(id);
-    client->bytes_out = 0;
-    client->total_bytes_out = 0;
-    client->bytes_out_per_sec = 0;
     return client;
 }
 
@@ -183,8 +179,8 @@ static struct topic *create_topic(const char *name) {
 }
 
 /*
- * Creates an subscriber edge struct source and target.
- * subscribe == client -> topic
+ * Creates an subscriber edge struct from source and target.
+ * subscribe == topic -> client
  * src should be a topic, tgt should be a client.
  */
 static struct sub_edge *create_sub_edge(const char *src, const char *tgt) {
@@ -195,6 +191,25 @@ static struct sub_edge *create_sub_edge(const char *src, const char *tgt) {
     sub_edge->next = NULL;
     sub_edge->prev = NULL;
     return sub_edge;
+}
+
+/*
+ * Creates a publisher edge struct from source and target.
+ * publish == client -> topic
+ * src should be a client, tgt should be a topic.
+ */
+static struct pub_edge *create_pub_edge(const char *src, const char *tgt) {
+    struct pub_edge *pub_edge = (struct pub_edge *)mosquitto__malloc(sizeof(struct pub_edge));
+    if (!pub_edge) return NULL;
+    pub_edge->json = create_edge_json(src, tgt);
+    pub_edge->pub = NULL;
+    pub_edge->next = NULL;
+    pub_edge->prev = NULL;
+    pub_edge->bytes_out = 0;
+    pub_edge->total_bytes_out = 0;
+    pub_edge->bytes_out_per_sec = 0;
+    pub_edge->timeout = 0;
+    return pub_edge;
 }
 
 /*
@@ -316,6 +331,19 @@ static struct sub_edge *find_sub_edge(struct topic *topic, struct client *client
 }
 
 /*
+ * Searches for a pub edge
+ */
+static struct pub_edge *find_pub_edge(struct client *client, struct topic *topic) {
+    struct pub_edge *curr = client->pub_list;
+    for (; curr != NULL; curr = curr->next) {
+        if (curr->pub == topic) {
+            return curr;
+        }
+    }
+    return NULL;
+}
+
+/*
  * Searches for a subscribed topic
  */
 static struct topic *find_sub_topic(const char *topic) {
@@ -398,6 +426,32 @@ static int graph_delete_topic_sub_edges(struct topic *topic) {
 }
 
 /*
+ * Decreased the reference count of the topic pointed to by a pub_edge
+ */
+static int pub_edge_decr_ref_cnt(struct pub_edge *pub_edge) {
+    --pub_edge->pub->ref_cnt;
+    if (pub_edge->pub->ref_cnt == 0) {
+        pub_edge->pub->timeout = TIMEOUT;
+    }
+    return 0;
+}
+
+/*
+ * Deletes all the publish edges of a client
+ */
+static int graph_delete_client_pub_edges(struct client *client) {
+    struct pub_edge *curr = client->pub_list, *temp;
+    while (curr != NULL) {
+        temp = curr;
+        curr =  curr->next;
+        pub_edge_decr_ref_cnt(temp);
+        cJSON_Delete(temp->json);
+        mosquitto__free(temp);
+    }
+    return 0;
+}
+
+/*
  * Detaches a topic from the topic list
  */
 static inline void graph_detach_topic(struct topic *topic) {
@@ -471,12 +525,51 @@ static int graph_delete_sub_edge(struct topic *topic, struct client *client) {
 }
 
 /*
+ * Adds a pub edge to the pub list
+ */
+static int graph_add_pub_edge(struct client *client, struct pub_edge *pub_edge) {
+    pub_edge->next = client->pub_list;
+    if (client->pub_list != NULL) {
+        client->pub_list->prev = pub_edge;
+    }
+    client->pub_list = pub_edge;
+    return 0;
+}
+
+/*
+ * Deletes a pub edge from the pub list
+ */
+static int graph_delete_pub(struct client *client, struct pub_edge *pub_edge) {
+    if (client->pub_list == pub_edge) {
+        client->pub_list = client->pub_list->next;
+    }
+    if (pub_edge->next != NULL) {
+        pub_edge->next->prev = pub_edge->prev;
+    }
+    if (pub_edge->prev != NULL) {
+        pub_edge->prev->next = pub_edge->next;
+    }
+    pub_edge_decr_ref_cnt(pub_edge);
+    cJSON_Delete(pub_edge->json);
+    mosquitto__free(pub_edge);
+    return 0;
+}
+
+/*
+ * Deletes a pub edge from the pub list
+ */
+static int graph_delete_pub_edge(struct client *client, struct topic *topic) {
+    struct pub_edge *pub_edge = find_pub_edge(client, topic);
+    if (pub_edge == NULL) return -1;
+    graph_delete_pub(client, pub_edge);
+    return 0;
+}
+
+/*
  * Deletes an IP container
  */
 static int graph_delete_ip(struct ip_container *ip_cont) {
-    size_t idx;
-
-    idx = ip_cont->hash % graph->ip_dict->max_size;
+    size_t idx = ip_cont->hash % graph->ip_dict->max_size;
     if (graph->ip_dict->ip_list[idx] == ip_cont) {
         graph->ip_dict->ip_list[idx] = graph->ip_dict->ip_list[idx]->next;
     }
@@ -524,17 +617,8 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
         }
     }
 
-    // if topic is only one pubbed, delete topic by setting timeout
-    if (client->pub_topic != NULL) {
-        --client->pub_topic->ref_cnt;
-        if (client->pub_topic->ref_cnt == 0) {
-            client->pub_topic->timeout = TOPIC_TIMEOUT;
-            // graph_delete_topic(client->pub_topic);
-        }
-    }
-
+    graph_delete_client_pub_edges(client);
     cJSON_Delete(client->json);
-    cJSON_Delete(client->pub_json);
     mosquitto__free(client);
     return 0;
 }
@@ -570,16 +654,13 @@ int network_graph_cleanup(void) {
     struct topic *topic_curr, *topic_temp;
 
     for(size_t i = 0; i < graph->ip_dict->max_size; ++i) {
-        if ((ip_curr = graph->ip_dict->ip_list[i]) == NULL) continue;
-
+        ip_curr = graph->ip_dict->ip_list[i];
         while (ip_curr != NULL) {
             client = ip_curr->client_list;
             while (client != NULL) {
                 client_temp = client;
                 client = client->next;
-                if (client_temp->pub_topic != NULL) {
-                    cJSON_Delete(client_temp->pub_json);
-                }
+                graph_delete_client_pub_edges(client_temp);
                 cJSON_Delete(client_temp->json);
                 mosquitto__free(client_temp);
             }
@@ -591,8 +672,7 @@ int network_graph_cleanup(void) {
     }
 
     for(size_t i = 0; i < graph->topic_dict->max_size; ++i) {
-        if ((topic_curr = graph->topic_dict->topic_list[i]) == NULL) continue;
-
+        topic_curr = graph->topic_dict->topic_list[i];
         while (topic_curr != NULL) {
             topic_temp = topic_curr;
             topic_curr = topic_curr->next;
@@ -648,6 +728,7 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
     struct ip_container *ip_cont;
     struct client *client;
     struct topic *topic_vert;
+    struct pub_edge *pub_edge;
     unsigned long topic_hash = sdbm_hash(topic);
 
     if (context->is_bridge && context->bridge != NULL) {
@@ -668,38 +749,27 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
         goto lookup_error;
     }
 
+    // topic doesnt exist
     if ((topic_vert = find_pub_topic(topic)) == NULL) {
         topic_vert = create_topic(topic);
         graph_add_topic(topic_vert);
+        pub_edge = create_pub_edge(id, topic);
+        pub_edge->pub = topic_vert;
+        graph_add_pub_edge(client, pub_edge);
+        ++topic_vert->ref_cnt;
+    }
+    // topic exists, but pub edge doesnt
+    else if ((pub_edge = find_pub_edge(client, topic_vert)) == NULL) {
+        pub_edge = create_pub_edge(id, topic);
+        pub_edge->pub = topic_vert;
+        graph_add_pub_edge(client, pub_edge);
+        ++topic_vert->ref_cnt;
     }
 
     topic_vert->bytes += payloadlen;
     topic_vert->total_bytes += (uint64_t)payloadlen;
-    client->bytes_out += payloadlen;
-    client->total_bytes_out += (uint64_t)payloadlen;
-
-    if (client->pub_topic != NULL) { // client is publishing to a topic already
-        if (topic_vert != client->pub_topic) { // client is publishing to a new topic
-            // unpublish to old topic
-            --client->pub_topic->ref_cnt;
-            if (client->pub_topic->ref_cnt == 0) {
-                client->pub_topic->timeout = TOPIC_TIMEOUT;
-                // graph_delete_topic(client->pub_topic);
-            }
-            // publish to new topic
-            ++topic_vert->ref_cnt;
-        }
-        else {  // client is publishing to the same topic
-            return 0;
-        }
-    }
-    else {
-        ++topic_vert->ref_cnt;
-    }
-
-    cJSON_Delete(client->pub_json);
-    client->pub_json = create_edge_json(id, topic);
-    client->pub_topic = topic_vert;
+    pub_edge->bytes_out += payloadlen;
+    pub_edge->total_bytes_out += (uint64_t)payloadlen;
 
     return 0;
 
@@ -712,7 +782,7 @@ lookup_error:
  * Called after client subscribes to topic
  */
 int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
-    if (topic[0] == '$') return 0;
+    if (topic[0] == '$') return 0; // ignore $SYS topics
     bool match, match_found = false;
     char *address, *id;
     struct ip_container *ip_cont;
@@ -760,7 +830,7 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
     //     topic_vert = create_topic(topic);
     //     topic_vert->ref_cnt = -1; // $SYS topics should never be removed
     //     graph_add_topic(topic_vert);
-    //     sub_edge = create_sub_edge(topic, id);
+    //     sub_edge = create_sub_edge(id, topic);
     //     graph_add_sub_edge(topic_vert, sub_edge);
     //     sub_edge->sub = client;
     // }
@@ -865,6 +935,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
     struct ip_container *ip_cont;
     struct client *client;
     struct sub_edge *sub_edge;
+    struct pub_edge *pub_edge, *pub_edge_temp;
     struct topic *topic, *temp;
 
     double temp_bytes;
@@ -876,7 +947,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
             topic = graph->topic_dict->topic_list[i];
             while (topic != NULL) {
                 topic->timeout -= (long)(now - last_update); // update timeout
-                if (topic->ref_cnt == 0 && topic->timeout <= 0) { // delete topic if timeout < 0
+                if (topic->ref_cnt == 0 && topic->timeout <= 0) {
                     temp = topic;
                     topic = topic->next;
                     graph_delete_topic(temp);
@@ -913,16 +984,32 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
 
                 for (; client != NULL; client = client->next) {
                     cJSON_AddItemToArray(graph->json, client->json);
-                    if (client->pub_topic != NULL) { // client may have a published topic
-                        temp_bytes = (double)client->bytes_out / (now - last_update);
-                        client->bytes_out = 0;
 
-                        // update outgoing bytes/s from client
-                        client->bytes_out_per_sec = temp_bytes;
-                        snprintf(buf, BUFLEN, "%.2f bytes/s", client->bytes_out_per_sec);
-                        data = cJSON_GetObjectItem(client->pub_json, "data");
-                        cJSON_SetValuestring(cJSON_GetObjectItem(data, "label"), buf);
-                        cJSON_AddItemToArray(graph->json, client->pub_json);
+                    pub_edge = client->pub_list;
+                    while(pub_edge != NULL) { // client may have published topics
+                        pub_edge_temp = pub_edge;
+                        pub_edge = pub_edge->next;
+
+                        temp_bytes = (double)pub_edge_temp->bytes_out / (now - last_update);
+                        pub_edge_temp->bytes_out = 0;
+                        pub_edge_temp->bytes_out_per_sec = temp_bytes;
+
+                        pub_edge_temp->timeout -= (long)(now - last_update); // update timeout
+                        if (pub_edge_temp->bytes_out_per_sec == 0.0) {
+                            if (pub_edge_temp->timeout <= 0) {
+                                graph_delete_pub(client, pub_edge_temp);
+                            }
+                            else {
+                                pub_edge_temp->timeout = TIMEOUT;
+                            }
+                        }
+                        else {
+                            // update outgoing bytes/s from client
+                            snprintf(buf, BUFLEN, "%.2f bytes/s", pub_edge_temp->bytes_out_per_sec);
+                            data = cJSON_GetObjectItem(pub_edge_temp->json, "data");
+                            cJSON_SetValuestring(cJSON_GetObjectItem(data, "label"), buf);
+                            cJSON_AddItemToArray(graph->json, pub_edge_temp->json);
+                        }
                     }
                 }
             }
@@ -930,7 +1017,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
 
         // send out the updated graph to $SYS/graph topic
         json_buf = cJSON_Print(graph->json);
-        db__messages_easy_queue(db, NULL, "$SYS/graph", 2, strlen(json_buf), json_buf, 1, 5, NULL);
+        db__messages_easy_queue(db, NULL, "$SYS/graph", 2, strlen(json_buf), json_buf, 1, 0, NULL);
         free(json_buf);
         unlink_json();
 

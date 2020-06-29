@@ -6,12 +6,24 @@
 #include "mosquitto.h"
 
 struct client;
+struct topic;
 
 struct sub_edge {
     cJSON *json;                // edge JSON
     struct client *sub;         // pointer to client that is subbed to topic
     struct sub_edge *next;
     struct sub_edge *prev;
+};
+
+struct pub_edge {
+    cJSON *json;                // edge JSON
+    struct topic *pub;          // pointer to topic that is client is pubbed to
+    struct pub_edge *next;
+    struct pub_edge *prev;
+    uint32_t bytes_out;
+    uint64_t total_bytes_out;
+    double bytes_out_per_sec;
+    long timeout;               // time until deletion
 };
 
 struct topic {
@@ -30,13 +42,9 @@ struct topic {
 
 struct client {
     cJSON *json;
-    cJSON *pub_json;            // "edge JSON" of currently pubbed topic
     struct client *next;
     struct client *prev;
-    struct topic *pub_topic;    // current topic client is pubbing to
-    uint32_t bytes_out;
-    uint64_t total_bytes_out;
-    double bytes_out_per_sec;
+    struct pub_edge *pub_list;  // current topic client is pubbing to
     unsigned long hash;         // hash(client_id)
 };
 

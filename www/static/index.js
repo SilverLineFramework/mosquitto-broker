@@ -29,7 +29,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 'text-outline-color': 'LightBlue'
             }
         }, {
-            selector: 'node[class="client ip"]',
+            selector: 'node[class="ip"]',
             style: {
                 "font-size": 4.0,
                 'shape': 'barrel',
@@ -62,12 +62,25 @@ document.addEventListener('DOMContentLoaded', function() {
         }]
     });
 
-    const ip_main = "localhost"; // "spatial.andrew.cmu.edu";
-    const port = 9001; // 9000;
+    let ip_main = "localhost";
+    let port = 9001;
+    if (isBridge && !isSpatial) {
+        // ip_main = "localhost"; // "spatial.andrew.cmu.edu";
+        port = 9000;
+    }
+    else if (!isBridge && isSpatial) {
+        ip_main = "spatial.andrew.cmu.edu";
+        port = 9000;
+    }
+    else if (isBridge && isSpatial) {
+        ip_main = "spatial.andrew.cmu.edu";
+        port = 9002;
+    }
     const client_main = new Paho.MQTT.Client(`ws://${ip_main}:${port}/`, "client_js_" + new Date().getTime());
     const graph_topic = "$SYS/graph";
 
     let prevJSON = [];
+    let paused = false;
 
     let action = null;
 
@@ -134,16 +147,20 @@ document.addEventListener('DOMContentLoaded', function() {
 
         try {
             if (newJSON != undefined) {
-                cy.json({ elements: newJSON });
-                runLayout();
+                if (!paused) {
+                    cy.json({ elements: newJSON });
+                    runLayout();
+                }
                 prevJSON.push(newJSON);
             }
             spinner.style.display = "none";
             uptodate.style.display = "block";
-            setTimeout(() => {
-                spinner.style.display = "block";
-                uptodate.style.display = "none";
-            }, 1500);
+            if (!paused) {
+                setTimeout(() => {
+                    spinner.style.display = "block";
+                    uptodate.style.display = "none";
+                }, 1500);
+            }
         }
         catch (err) {
             console.log(err.message)
@@ -206,6 +223,20 @@ document.addEventListener('DOMContentLoaded', function() {
     span.onclick = function() {
         undisplayModal()
     }
+
+    document.getElementById("pause").addEventListener("click", function() {
+        paused = !paused;
+        if (paused) {
+            this.innerText = "Unpause";
+            spinner.style.display = "none";
+            uptodate.style.display = "block";
+        }
+        else {
+            this.innerText = "Pause";
+            spinner.style.display = "block";
+            uptodate.style.display = "none";
+        }
+    });
 
     document.getElementById("connect").addEventListener("click", function() {
         action = "Connect";
