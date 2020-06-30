@@ -418,7 +418,7 @@ static int graph_delete_topic_sub_edges(struct topic *topic) {
     struct sub_edge *curr = topic->sub_list, *temp;
     while (curr != NULL) {
         temp = curr;
-        curr =  curr->next;
+        curr = curr->next;
         cJSON_Delete(temp->json);
         mosquitto__free(temp);
     }
@@ -443,7 +443,7 @@ static int graph_delete_client_pub_edges(struct client *client) {
     struct pub_edge *curr = client->pub_list, *temp;
     while (curr != NULL) {
         temp = curr;
-        curr =  curr->next;
+        curr = curr->next;
         pub_edge_decr_ref_cnt(temp);
         cJSON_Delete(temp->json);
         mosquitto__free(temp);

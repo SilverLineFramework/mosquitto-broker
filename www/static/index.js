@@ -62,21 +62,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }]
     });
 
-    let ip_main = "localhost";
-    let port = 9001;
-    if (isBridge && !isSpatial) {
-        port = 9000;
-    }
-    else if (!isBridge && isSpatial) {
-        ip_main = "spatial.andrew.cmu.edu";
-        port = 9000;
-    }
-    else if (isBridge && isSpatial) {
-        ip_main = "spatial.andrew.cmu.edu";
-        port = 9002;
-    }
-    const client_main = new Paho.MQTT.Client(`ws://${ip_main}:${port}/`, "client_js_" + new Date().getTime());
-    const graph_topic = "$SYS/graph";
+    const clientMain = new Paho.MQTT.Client(`ws://${ip_main}/mqtt/`, "client_js_" + new Date().getTime());
+    const graphTopic = "$SYS/graph";
 
     let prevJSON = [];
     let paused = false;
@@ -98,14 +85,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
     let msgText = document.getElementById("msg");
 
-    client_main.onConnectionLost = onConnectionLost;
-    client_main.onMessageArrived = onMessageArrived;
+    clientMain.onConnectionLost = onConnectionLost;
+    clientMain.onMessageArrived = onMessageArrived;
 
-    client_main.connect({ onSuccess: onConnect });
+    clientMain.connect({ onSuccess: onConnect });
 
     function onConnect() {
         console.log("Connected!");
-        client_main.subscribe(graph_topic);
+        clientMain.subscribe(graphTopic);
     }
 
     function onConnectionLost(responseObject) {
@@ -115,7 +102,7 @@ document.addEventListener('DOMContentLoaded', function() {
         spinner.style.display = "none";
         uptodate.style.display = "block";
         uptodate.innerText = "Connecton lost. Refresh to try again.";
-        // client_main.connect({ onSuccess: onConnect });
+        // clientMain.connect({ onSuccess: onConnect });
     }
 
     function publish(client, dest, msg) {
