@@ -65,7 +65,6 @@ document.addEventListener('DOMContentLoaded', function() {
     let ip_main = "localhost";
     let port = 9001;
     if (isBridge && !isSpatial) {
-        // ip_main = "localhost"; // "spatial.andrew.cmu.edu";
         port = 9000;
     }
     else if (!isBridge && isSpatial) {

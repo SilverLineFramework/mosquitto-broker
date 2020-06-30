@@ -1,13 +1,9 @@
 #!/bin/sh
 
-OPENSSL_DIR=$(find /usr/local/Cellar/openssl -name '1.*')
-
-# echo "*** Check for libwebsockets ***"
-# if [ ! -d "./libwebsockets" ]
-# then
-#     echo "*** libwebsockets doesn't exist, running setup... ***"
-#     sh ./setup.sh
-# fi
+if [ "$(uname)" == "Darwin" ]
+then
+    OPENSSL_DIR=$(find /usr/local/Cellar/openssl -name '1.*')
+fi
 
 if [ -d "./build" ]
 then

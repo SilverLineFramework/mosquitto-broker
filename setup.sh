@@ -1,8 +1,11 @@
 #!/bin/sh
 
-echo "*** Installing dependencies using Homebrew ***"
-brew update
-brew install cmake openssl
+if [ "$(uname)" == "Darwin" ]
+then
+    echo "*** Installing dependencies using Homebrew ***"
+    brew update
+    brew install cmake openssl
+fi
 
 OPENSSL_DIR=$(find /usr/local/Cellar/openssl -name '1.*')
 echo "OpenSSL installed in: $OPENSSL_DIR"
@@ -20,5 +23,11 @@ echo "*** Building libwebsockets ***"
 cmake .. -DOPENSSL_ROOT_DIR="$OPENSSL_DIR"
 make
 cd ..
+
+if [ ! -d "./cJSON" ]
+then
+    echo "*** Downloading cJSON ***"
+    git submodule add --force https://github.com/DaveGamble/cJSON.git
+fi
 
 echo "*** Set up done ***"
