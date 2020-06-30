@@ -10,10 +10,13 @@ This repo is made with the goal to monitor and visualize connected pub/sub clien
 
 ## Building
 
-If you are using Mac or Linux, run ```./setup.sh``` and then run ```./build.sh``` to build binaries
-with websockets support.
+Clone repo using ```git clone https://github.com/conix-center/mosquitto --recursive```
 
-Server and client executables will be found in the bin/ directory.
+If you are using Mac, run ```./setup.sh``` to install dependencies and then run ```./build.sh``` to build.
+
+If you are using Linux, just run ```./build.sh``` to build.
+
+Broker and client executables will be found in the bin/ directory.
 
 ## Links
 
@@ -33,9 +36,9 @@ There is also a public test server available at <https://test.mosquitto.org/>
 
 ## Quick start
 
-Server can be started with a basic configuration:
+Server can be started like so:
 
-    mosquitto
+    mosquitto -c <file>.cfg
 
 Then use `mosquitto_sub` to subscribe to a topic:
 
