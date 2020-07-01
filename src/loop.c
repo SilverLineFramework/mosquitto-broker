@@ -209,7 +209,9 @@ int mosquitto_main_loop(struct mosquitto_db *db, mosq_sock_t *listensock, int li
 		if(db->config->sys_interval > 0){
 			sys_tree__update(db, db->config->sys_interval, start_time);
 		}
+#endif
 
+#ifdef WITH_GRAPH
 		if(db->config->graph_interval > 0){
 			network_graph_update(db, db->config->graph_interval);
 		}

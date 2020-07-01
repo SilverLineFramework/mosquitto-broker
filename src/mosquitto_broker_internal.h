@@ -304,6 +304,7 @@ struct mosquitto__config {
 	bool set_tcp_nodelay;
 	int sys_interval;
 	int graph_interval;
+	int graph_timeout;
 	bool upgrade_outgoing_qos;
 	char *user;
 #ifdef WITH_WEBSOCKETS

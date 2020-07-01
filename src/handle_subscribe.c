@@ -184,7 +184,9 @@ int handle__subscribe(struct mosquitto_db *db, struct mosquitto *context)
 
 				log__printf(NULL, MOSQ_LOG_SUBSCRIBE, "%s %d %s", context->id, qos, sub);
 			}
+#ifdef WITH_GRAPH
 			network_graph_add_subtopic(context, sub);
+#endif
 			mosquitto__free(sub);
 
 			tmp_payload = mosquitto__realloc(payload, payloadlen + 1);

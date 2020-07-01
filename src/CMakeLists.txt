@@ -108,6 +108,12 @@ if (WITH_SYS_TREE)
 	add_definitions("-DWITH_SYS_TREE")
 endif (WITH_SYS_TREE)
 
+option(WITH_GRAPH
+	"Include $SYS tree support?" ON)
+if (WITH_GRAPH)
+	add_definitions("-DWITH_GRAPH")
+endif (WITH_GRAPH)
+
 option(WITH_ADNS
 	"Include ADNS support?" OFF)
 

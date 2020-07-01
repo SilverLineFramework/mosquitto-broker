@@ -70,11 +70,12 @@ struct topic_dict {
 
 struct network_graph {
     cJSON *json;
+    int timeout;
     struct ip_dict *ip_dict;
     struct topic_dict *topic_dict;
 };
 
-int network_graph_init(void);
+int network_graph_init(struct mosquitto_db *db);
 int network_graph_cleanup(void);
 int network_graph_add_client(struct mosquitto *context);
 int network_graph_add_subtopic(struct mosquitto *context, const char *topic);

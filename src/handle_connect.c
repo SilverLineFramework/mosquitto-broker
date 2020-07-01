@@ -198,7 +198,9 @@ int connect__on_authorised(struct mosquitto_db *db, struct mosquitto *context, v
 						context->address, context->id, context->protocol, context->clean_start, context->keepalive);
 			}
 		}
+#ifdef WITH_GRAPH
 		network_graph_add_client(context);
+#endif
 
 		if(context->will) {
 			log__printf(NULL, MOSQ_LOG_DEBUG, "Will message specified (%ld bytes) (r%d, q%d).",

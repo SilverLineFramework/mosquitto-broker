@@ -14,7 +14,6 @@
 
 // #define MAX_TOPIC_LEN   32767
 #define BUFLEN          100
-#define TIMEOUT         20      // seconds
 
 // Useful constants //
 const char s[2] = "/";
@@ -422,6 +421,7 @@ static int graph_delete_topic_sub_edges(struct topic *topic) {
         cJSON_Delete(temp->json);
         mosquitto__free(temp);
     }
+    topic->sub_list = NULL;
     return 0;
 }
 
@@ -431,7 +431,7 @@ static int graph_delete_topic_sub_edges(struct topic *topic) {
 static int pub_edge_decr_ref_cnt(struct pub_edge *pub_edge) {
     --pub_edge->pub->ref_cnt;
     if (pub_edge->pub->ref_cnt == 0) {
-        pub_edge->pub->timeout = TIMEOUT;
+        pub_edge->pub->timeout = graph->timeout;
     }
     return 0;
 }
@@ -448,6 +448,7 @@ static int graph_delete_client_pub_edges(struct client *client) {
         cJSON_Delete(temp->json);
         mosquitto__free(temp);
     }
+    client->pub_list = NULL;
     return 0;
 }
 
@@ -625,7 +626,11 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
 
 /*****************************************************************************/
 
-int network_graph_init(void) {
+int network_graph_init(struct mosquitto_db *db) {
+    if(db->config->graph_interval == 0) {
+		return 0;
+	}
+
     graph = (struct network_graph *)mosquitto__malloc(sizeof(struct network_graph));
     if (!graph) return -1;
 
@@ -642,6 +647,8 @@ int network_graph_init(void) {
     if (!graph->topic_dict->topic_list) return -1;
     graph->topic_dict->max_size = 1;
     graph->topic_dict->used = 0;
+
+    graph->timeout = db->config->graph_timeout; // in seconds
 
     graph->json = cJSON_CreateArray();
 
@@ -811,8 +818,7 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
 
     // check if sub_edge already exists, if not, create sub_edge
     for(size_t i = 0; i < graph->topic_dict->max_size; ++i) {
-        if ((topic_vert = graph->topic_dict->topic_list[i]) == NULL) continue;
-
+        topic_vert = graph->topic_dict->topic_list[i];
         for (; topic_vert != NULL; topic_vert = topic_vert->next) {
             mosquitto_topic_matches_sub(topic, topic_vert->full_name, &match);
             if (match) {
@@ -924,7 +930,7 @@ static inline void unlink_json() {
 }
 
 /*
- * Called every db->config->graph_interval units (currently every 5s)
+ * Called every graph->interval seconds
  */
 void network_graph_update(struct mosquitto_db *db, int interval) {
     static time_t last_update = 0;
@@ -978,10 +984,11 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
         // graph has a list of all IP addresses
         for (size_t i = 0; i < graph->ip_dict->max_size; ++i) {
             ip_cont = graph->ip_dict->ip_list[i];
+
             for (; ip_cont != NULL; ip_cont = ip_cont->next) {
                 cJSON_AddItemToArray(graph->json, ip_cont->json);
-                client = ip_cont->client_list; // each IP address holds a list of clients
 
+                client = ip_cont->client_list; // each IP address holds a list of clients
                 for (; client != NULL; client = client->next) {
                     cJSON_AddItemToArray(graph->json, client->json);
 
@@ -1000,7 +1007,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                                 graph_delete_pub(client, pub_edge_temp);
                             }
                             else {
-                                pub_edge_temp->timeout = TIMEOUT;
+                                pub_edge_temp->timeout = graph->timeout;
                             }
                         }
                         else {

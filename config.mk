@@ -57,6 +57,10 @@ WITH_MEMORY_TRACKING:=yes
 # information about the broker state.
 WITH_SYS_TREE:=yes
 
+# Comment out to remove publishing of the $GRAPH topic hierarchy containing
+# information about the network topology.
+WITH_GRAPH:=yes
+
 # Build with systemd support. If enabled, mosquitto will notify systemd after
 # initialization. See README in service/systemd/ for more information.
 WITH_SYSTEMD:=no
@@ -249,6 +253,10 @@ endif
 
 ifeq ($(WITH_SYS_TREE),yes)
 	BROKER_CPPFLAGS:=$(BROKER_CPPFLAGS) -DWITH_SYS_TREE
+endif
+
+ifeq ($(WITH_GRAPH),yes)
+	BROKER_CPPFLAGS:=$(BROKER_CPPFLAGS) -DWITH_GRAPH
 endif
 
 ifeq ($(WITH_SYSTEMD),yes)

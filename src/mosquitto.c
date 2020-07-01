@@ -289,8 +289,11 @@ int main(int argc, char *argv[])
 	if(rc) return rc;
 	rc = mosquitto_security_init(&int_db, false);
 	if(rc) return rc;
-	rc = network_graph_init();
+
+#ifdef WITH_GRAPH
+	rc = network_graph_init(&int_db);
 	if(rc) return rc;
+#endif
 
 #ifdef WITH_SYS_TREE
 	sys_tree__init(&int_db);

@@ -200,7 +200,8 @@ static void config__init_reload(struct mosquitto_db *db, struct mosquitto__confi
 	config->retain_available = true;
 	config->set_tcp_nodelay = false;
 	config->sys_interval = 10;
-	config->graph_interval = 5;
+	config->graph_interval = 60;
+	config->graph_timeout = 20;
 	config->upgrade_outgoing_qos = false;
 
 	config__cleanup_plugins(config);
@@ -583,6 +584,7 @@ void config__copy(struct mosquitto__config *src, struct mosquitto__config *dest)
 	dest->queue_qos0_messages = src->queue_qos0_messages;
 	dest->sys_interval = src->sys_interval;
 	dest->graph_interval = src->graph_interval;
+	dest->graph_timeout = src->graph_timeout;
 	dest->upgrade_outgoing_qos = src->upgrade_outgoing_qos;
 
 #ifdef WITH_WEBSOCKETS
@@ -1904,6 +1906,13 @@ int config__read_file_core(struct mosquitto__config *config, bool reload, struct
 					if(conf__parse_int(&token, "graph_interval", &config->graph_interval, saveptr)) return MOSQ_ERR_INVAL;
 					if(config->graph_interval < 0 || config->graph_interval > 65535){
 						log__printf(NULL, MOSQ_LOG_ERR, "Error: Invalid graph_interval value (%d).", config->graph_interval);
+						return MOSQ_ERR_INVAL;
+					}
+				}
+				else if(!strcmp(token, "graph_timeout")){
+					if(conf__parse_int(&token, "graph_timeout", &config->graph_timeout, saveptr)) return MOSQ_ERR_INVAL;
+					if(config->graph_timeout < 0 || config->graph_timeout > 65535){
+						log__printf(NULL, MOSQ_LOG_ERR, "Error: Invalid graph_timeout value (%d).", config->graph_interval);
 						return MOSQ_ERR_INVAL;
 					}
 				}else if(!strcmp(token, "threshold")){
