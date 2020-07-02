@@ -23,4 +23,4 @@ while False == False:
         client.publish(t, rand_str(random.randint(100,1000)), retain=False)
         client.subscribe(t, 2)
 
-    time.sleep(1)
+    # time.sleep(1)

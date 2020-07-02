@@ -9,53 +9,52 @@ struct client;
 struct topic;
 
 struct sub_edge {
-    cJSON *json;                // edge JSON
-    struct client *sub;         // pointer to client that is subbed to topic
+    cJSON *json;                    // edge JSON
+    struct client *sub;             // pointer to client that is subbed to topic
     struct sub_edge *next;
     struct sub_edge *prev;
 };
 
 struct pub_edge {
-    cJSON *json;                // edge JSON
-    struct topic *pub;          // pointer to topic that is client is pubbed to
+    int til_delete;                 // "delete counter", if == 0, delete
+    cJSON *json;                    // edge JSON
+    struct topic *pub;              // pointer to topic that is client is pubbed to
     struct pub_edge *next;
     struct pub_edge *prev;
     uint32_t bytes_out;
     uint64_t total_bytes_out;
     double bytes_out_per_sec;
-    char til_delete;
 };
 
 struct topic {
+    int til_delete;                 // "delete counter", if == 0, delete
     cJSON *json;
     struct topic *next;
     struct topic *prev;
-    struct sub_edge *sub_list;  // list of all subscriptions
-    char *full_name;            // full topic name
-    unsigned long hash;         // hash(full_name)
-    unsigned int ref_cnt;       // # of clients pubbed to topic
+    struct sub_edge *sub_list;      // list of all subscriptions
+    char *full_name;                // full topic name
+    unsigned long hash;             // hash(full_name)
+    unsigned int ref_cnt;           // # of clients pubbed to topic
     uint32_t bytes;
     uint64_t total_bytes;
     double bytes_per_sec;
-    char til_delete;
 };
 
 struct client {
-    bool latency_ready;
     cJSON *json;
     struct client *next;
     struct client *prev;
-    struct pub_edge *pub_list;  // current topic client is pubbing to
-    time_t latency;
-    unsigned long hash;         // hash(client_id)
+    struct pub_edge *pub_list;      // current topic client is pubbing to
+    double latency;                 // ms
+    unsigned long hash;             // hash(client_id)
 };
 
 struct ip_container {
     cJSON *json;
     struct ip_container *next;
     struct ip_container *prev;
-    struct client *client_list; // list of all clients with specific IP address
-    unsigned long hash;         // hash(IP)
+    struct client *client_list;     // list of all clients with specific IP address
+    unsigned long hash;             // hash(IP)
 };
 
 struct ip_dict {

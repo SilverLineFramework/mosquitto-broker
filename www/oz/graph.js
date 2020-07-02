@@ -6,15 +6,23 @@ document.addEventListener('DOMContentLoaded', function() {
         style: [{
             selector: 'node',
             style: {
-                'content': 'data(label)',
+                'content': 'data(id)',
                 'text-valign': 'center',
                 'text-halign': 'center',
+                'text-wrap': 'wrap',
                 'font-family' : 'Courier',
                 'text-outline-width': 0.5
             }
         }, {
             selector: 'node[class="client"]',
             style: {
+                'content': function(elem) {
+                    let additional_info = "";
+                    if (elem.data('latency') !== null && elem.data('latency') !== undefined) {
+                        additional_info = "\n(" + elem.data('latency') + " ms)";
+                    }
+                    return elem.data('id') + additional_info;
+                },
                 "font-size": 3.5,
                 'shape': 'round-rectangle',
                 'background-color': 'Coral',
@@ -46,7 +54,9 @@ document.addEventListener('DOMContentLoaded', function() {
         }, {
             selector: 'edge',
             style: {
-                'label': 'data(label)',
+                'content': function(elem) {
+                    return elem.data('bps') + "bytes/s";
+                },
                 "font-size": 3.5,
                 'width': 1.0,
                 'arrow-scale': 0.5,
@@ -62,8 +72,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }]
     });
 
-    const clientMain = new Paho.MQTT.Client("wss://oz.andrew.cmu.edu/mqtt/", "graph_" + new Date().getTime());
-    const graphTopic = "$SYS/graph";
+    const client = new Paho.MQTT.Client(brokerAddr, "graph_viewer_" + (+new Date).toString(36));
+    const graphTopic = "$GRAPH";
 
     let prevJSON = [];
     let paused = false;
@@ -71,14 +81,15 @@ document.addEventListener('DOMContentLoaded', function() {
     let spinner = document.querySelector(".refreshSpinner");
     let uptodate = document.getElementById("uptodate");
 
-    clientMain.onConnectionLost = onConnectionLost;
-    clientMain.onMessageArrived = onMessageArrived;
+    client.onConnectionLost = onConnectionLost;
+    client.onMessageArrived = onMessageArrived;
 
-    clientMain.connect({ onSuccess: onConnect });
+    client.connect({ onSuccess: onConnect });
 
     function onConnect() {
         console.log("Connected!");
-        clientMain.subscribe(graphTopic);
+        client.subscribe(graphTopic);
+        publish(client, "$GRAPH/latency", "", 2);
     }
 
     function onConnectionLost(responseObject) {
@@ -88,12 +99,13 @@ document.addEventListener('DOMContentLoaded', function() {
         spinner.style.display = "none";
         uptodate.style.display = "block";
         uptodate.innerText = "Connecton lost. Refresh to try again.";
-        // clientMain.connect({ onSuccess: onConnect });
+        // client.connect({ onSuccess: onConnect });
     }
 
-    function publish(client, dest, msg) {
+    function publish(client, dest, msg, qos) {
         let message = new Paho.MQTT.Message(msg);
         message.destinationName = dest;
+        message.qos = qos;
         client.send(message);
     }
 

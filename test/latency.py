@@ -9,10 +9,9 @@ client1 = mqtt.Client("client_py1", clean_session=True, userdata=None, transport
 client1.connect(broker, port)
 client1.loop_start()
 
-while True:
-    print "pub"
-    client1.publish("s", None, qos=2)
-    time.sleep(1)
+while False == False:
+    client1.publish("$GRAPH/latency", None, qos=2)
+    time.sleep(10)
 
 client1.disconnect()
 client1.loop_stop()
