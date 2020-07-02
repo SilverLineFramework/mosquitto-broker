@@ -21,9 +21,9 @@ struct pub_edge {
     struct topic *pub;              // pointer to topic that is client is pubbed to
     struct pub_edge *next;
     struct pub_edge *prev;
-    uint32_t bytes_out;
-    uint64_t total_bytes_out;
-    double bytes_out_per_sec;
+    uint32_t bytes;
+    uint64_t total_bytes;
+    double bytes_per_sec;
 };
 
 struct topic {
@@ -70,6 +70,7 @@ struct topic_dict {
 };
 
 struct network_graph {
+    bool changed;
     cJSON *json;
     char til_delete;
     struct ip_dict *ip_dict;

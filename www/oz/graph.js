@@ -55,7 +55,7 @@ document.addEventListener('DOMContentLoaded', function() {
             selector: 'edge',
             style: {
                 'content': function(elem) {
-                    return elem.data('bps') + "bytes/s";
+                    return elem.data('bps') + " bytes/s";
                 },
                 "font-size": 3.5,
                 'width': 1.0,
@@ -72,7 +72,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }]
     });
 
-    const client = new Paho.MQTT.Client(brokerAddr, "graph_viewer_" + (+new Date).toString(36));
+    const brokerAddr = "wss://oz.andrew.cmu.edu/mqtt/";
+    const client = new Paho.MQTT.Client(brokerAddr, "graphViewer-" + (+new Date).toString(36));
     const graphTopic = "$GRAPH";
 
     let prevJSON = [];
@@ -90,6 +91,9 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log("Connected!");
         client.subscribe(graphTopic);
         publish(client, "$GRAPH/latency", "", 2);
+        setInterval(() => {
+            publish(client, "$GRAPH/latency", "", 2);
+        }, 10000);
     }
 
     function onConnectionLost(responseObject) {
@@ -127,9 +131,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
     function onMessageArrived(message) {
         var newJSON = JSON.parse(message.payloadString);
-
         try {
-            if (newJSON != undefined) {
+            if (newJSON != undefined && newJSON.length > 0) {
                 if (!paused) {
                     cy.json({ elements: newJSON });
                     runLayout();
@@ -142,11 +145,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 setTimeout(() => {
                     spinner.style.display = "block";
                     uptodate.style.display = "none";
-                }, 1500);
+                }, 2000);
             }
         }
         catch (err) {
-            console.log(err.message)
+            console.log(err.message);
+            console.log(JSON.stringify(newJSON, undefined, 4));
         }
     }
 
