@@ -56,6 +56,9 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 			break;
 		case CMD_PUBREL:
 			rc = handle__pubrel(db, context);
+#ifdef WITH_GRAPH
+			network_graph_latency_end(context);
+#endif
 			break;
 		case CMD_CONNECT:
 			rc = handle__connect(db, context);

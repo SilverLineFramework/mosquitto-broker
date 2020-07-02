@@ -4,11 +4,11 @@ import time, random, string
 def rand_str(N):
     return ''.join(random.choice(string.ascii_lowercase+string.digits) for i in range(N))
 
-broker = "localhost"
+brokers = ["localhost", "127.0.0.1", "192.168.0.32", "Edwards-MacBook-Air.local"]
 port = 9001
 
 client = mqtt.Client("client_py_"+rand_str(5), clean_session=True, transport="websockets")
-client.connect(broker, port)
+client.connect(random.choice(brokers), port)
 client.loop_start()
 
 topics = []
@@ -21,5 +21,6 @@ while False == False:
     topics += [topic]
     for t in topics:
         client.publish(t, rand_str(random.randint(100,1000)), retain=False)
+        client.subscribe(t, 2)
 
     time.sleep(1)

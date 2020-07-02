@@ -23,7 +23,7 @@ struct pub_edge {
     uint32_t bytes_out;
     uint64_t total_bytes_out;
     double bytes_out_per_sec;
-    long timeout;               // time until deletion
+    char til_delete;
 };
 
 struct topic {
@@ -37,14 +37,16 @@ struct topic {
     uint32_t bytes;
     uint64_t total_bytes;
     double bytes_per_sec;
-    long timeout;               // time until deletion
+    char til_delete;
 };
 
 struct client {
+    bool latency_ready;
     cJSON *json;
     struct client *next;
     struct client *prev;
     struct pub_edge *pub_list;  // current topic client is pubbing to
+    time_t latency;
     unsigned long hash;         // hash(client_id)
 };
 
@@ -70,7 +72,7 @@ struct topic_dict {
 
 struct network_graph {
     cJSON *json;
-    int timeout;
+    char til_delete;
     struct ip_dict *ip_dict;
     struct topic_dict *topic_dict;
 };
@@ -82,6 +84,8 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic);
 int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uint32_t payloadlen);
 int network_graph_delete_client(struct mosquitto *context);
 int network_graph_delete_subtopic(struct mosquitto *context, const char *topic);
+int network_graph_latency_start(struct mosquitto *context);
+int network_graph_latency_end(struct mosquitto *context);
 void network_graph_update(struct mosquitto_db *db, int interval);
 void network_graph_pub(struct mosquitto_db *db);
 

@@ -4,8 +4,8 @@ import time, random, string
 def rand_str(N):
     return ''.join(random.choice(string.ascii_lowercase+string.digits) for i in range(N))
 
-broker = "oz.andrew.cmu.edu"
-port = 9002
+broker = "127.0.0.1"
+port = 9001
 
 clients = []
 start_topic = "initial/topic"

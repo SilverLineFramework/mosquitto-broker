@@ -153,6 +153,7 @@ static struct client *create_client(const char *id, const char *address) {
     client->pub_list = NULL;
     client->next = NULL;
     client->prev = NULL;
+    client->latency_ready = false;
     client->hash = sdbm_hash(id);
     return client;
 }
@@ -168,7 +169,7 @@ static struct topic *create_topic(const char *name) {
     topic->next = NULL;
     topic->prev = NULL;
     topic->ref_cnt = 0;
-    topic->timeout = 0;
+    topic->til_delete = 0;
     topic->bytes = 0;
     topic->total_bytes = 0;
     topic->bytes_per_sec = 0;
@@ -207,7 +208,7 @@ static struct pub_edge *create_pub_edge(const char *src, const char *tgt) {
     pub_edge->bytes_out = 0;
     pub_edge->total_bytes_out = 0;
     pub_edge->bytes_out_per_sec = 0;
-    pub_edge->timeout = 0;
+    pub_edge->til_delete = 0;
     return pub_edge;
 }
 
@@ -431,7 +432,7 @@ static int graph_delete_topic_sub_edges(struct topic *topic) {
 static int pub_edge_decr_ref_cnt(struct pub_edge *pub_edge) {
     --pub_edge->pub->ref_cnt;
     if (pub_edge->pub->ref_cnt == 0) {
-        pub_edge->pub->timeout = graph->timeout;
+        pub_edge->pub->til_delete = graph->til_delete;
     }
     return 0;
 }
@@ -627,7 +628,7 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
 /*****************************************************************************/
 
 int network_graph_init(struct mosquitto_db *db) {
-    if(db->config->graph_interval == 0) {
+    if (db->config->graph_interval == 0) {
 		return 0;
 	}
 
@@ -648,7 +649,7 @@ int network_graph_init(struct mosquitto_db *db) {
     graph->topic_dict->max_size = 1;
     graph->topic_dict->used = 0;
 
-    graph->timeout = db->config->graph_timeout; // in seconds
+    graph->til_delete = db->config->graph_del_mult;
 
     graph->json = cJSON_CreateArray();
 
@@ -885,6 +886,82 @@ lookup_error:
 }
 
 /*
+ * Called after sending PUBREL
+ */
+int network_graph_latency_start(struct mosquitto *context) {
+    char *address, *id;
+    struct ip_container *ip_cont;
+    struct client *client;
+
+    if (context->is_bridge && context->bridge != NULL) {
+        address = context->bridge->addresses[context->bridge->cur_address].address;
+    }
+    else {
+        address = context->address;
+    }
+    id = context->id;
+
+    if ((ip_cont = find_ip_container(address)) == NULL) {
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find ip!");
+        goto lookup_error;
+    }
+
+    if ((client = find_client(ip_cont, id)) == NULL) {
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find client!");
+        goto lookup_error;
+    }
+
+    client->latency = mosquitto_time_ns();
+    client->latency_ready = false;
+
+    return 0;
+
+lookup_error:
+    // network_graph_cleanup();
+    return -1;
+}
+
+/*
+ * Called after client sends PUBCOMP
+ */
+int network_graph_latency_end(struct mosquitto *context) {
+    char *address, *id;
+    struct ip_container *ip_cont;
+    struct client *client;
+
+    if (context->is_bridge && context->bridge != NULL) {
+        address = context->bridge->addresses[context->bridge->cur_address].address;
+    }
+    else {
+        address = context->address;
+    }
+    id = context->id;
+
+    if ((ip_cont = find_ip_container(address)) == NULL) {
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find ip!");
+        goto lookup_error;
+    }
+
+    if ((client = find_client(ip_cont, id)) == NULL) {
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find client!");
+        goto lookup_error;
+    }
+
+    if (!client->latency_ready) {
+        client->latency = mosquitto_time_ns() - client->latency;
+        client->latency_ready = true;
+    }
+
+    log__printf(NULL, MOSQ_LOG_DEBUG, "%lu", client->latency);
+
+    return 0;
+
+lookup_error:
+    // network_graph_cleanup();
+    return -1;
+}
+
+/*
  * Called before client disconnects
  */
 int network_graph_delete_client(struct mosquitto *context) {
@@ -901,11 +978,9 @@ int network_graph_delete_client(struct mosquitto *context) {
         log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not find client!");
         goto lookup_error;
     }
-    else {
-        if (graph_delete_client(ip_cont, client) < 0) {
-            log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not delete client!");
-            goto lookup_error;
-        }
+    else if (graph_delete_client(ip_cont, client) < 0) {
+        log__printf(NULL, MOSQ_LOG_DEBUG, "ERROR: could not delete client!");
+        goto lookup_error;
     }
 
     return 0;
@@ -952,8 +1027,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
         for (size_t i = 0; i < graph->topic_dict->max_size; ++i) {
             topic = graph->topic_dict->topic_list[i];
             while (topic != NULL) {
-                topic->timeout -= (long)(now - last_update); // update timeout
-                if (topic->ref_cnt == 0 && topic->timeout <= 0) {
+                if (topic->ref_cnt == 0 && --topic->til_delete == 0) {
                     temp = topic;
                     topic = topic->next;
                     graph_delete_topic(temp);
@@ -993,7 +1067,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                     cJSON_AddItemToArray(graph->json, client->json);
 
                     pub_edge = client->pub_list;
-                    while(pub_edge != NULL) { // client may have published topics
+                    while (pub_edge != NULL) { // client may have published topics
                         pub_edge_temp = pub_edge;
                         pub_edge = pub_edge->next;
 
@@ -1001,13 +1075,12 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                         pub_edge_temp->bytes_out = 0;
                         pub_edge_temp->bytes_out_per_sec = temp_bytes;
 
-                        pub_edge_temp->timeout -= (long)(now - last_update); // update timeout
                         if (pub_edge_temp->bytes_out_per_sec == 0.0) {
-                            if (pub_edge_temp->timeout <= 0) {
+                            if (--pub_edge_temp->til_delete == 0) {
                                 graph_delete_pub(client, pub_edge_temp);
                             }
                             else {
-                                pub_edge_temp->timeout = graph->timeout;
+                                pub_edge_temp->til_delete = graph->til_delete;
                             }
                         }
                         else {

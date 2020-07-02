@@ -12,16 +12,14 @@ fi
 mkdir build
 cd build
 
+echo "*** Building mosquitto ***"
 if [ "$(uname)" == "Darwin" ]
 then
-    echo "*** Building mosquitto ***"
     echo "OpenSSL from: $OPENSSL_DIR"
     cmake .. -DOPENSSL_ROOT_DIR="$OPENSSL_DIR" -DWITH_WEBSOCKETS=ON -DDOCUMENTATION=OFF -DCMAKE_C_FLAGS="-I$PWD/../libwebsockets/build/include" -DCMAKE_EXE_LINKER_FLAGS="-L$PWD/../libwebsockets/build/lib -lwebsockets"
     make
     cd ..
 else
-    echo "*** Building mosquitto ***"
-    echo "OpenSSL from: $OPENSSL_DIR"
     cmake .. -DWITH_WEBSOCKETS=ON -DDOCUMENTATION=OFF -DCMAKE_C_FLAGS="-I/usr/local/include" -DCMAKE_EXE_LINKER_FLAGS="-L/usr/local/lib -lwebsockets"
     make
     cd ..
