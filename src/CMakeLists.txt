@@ -56,8 +56,8 @@ set (MOSQ_SRCS
 	subs.c
 	sys_tree.c sys_tree.h
 	network_graph.c network_graph.h
-	../libwebsockets/cJSON/cJSON.c ../libwebsockets/cJSON/cJSON.h
-	../libwebsockets/cJSON/cJSON_Utils.c ../libwebsockets/cJSON/cJSON_Utils.h
+	../cJSON/cJSON.c ../cJSON/cJSON.h
+	../cJSON/cJSON_Utils.c ../cJSON/cJSON_Utils.h
 	../lib/time_mosq.c
 	../lib/tls_mosq.c
 	../lib/util_mosq.c ../lib/util_topic.c ../lib/util_mosq.h

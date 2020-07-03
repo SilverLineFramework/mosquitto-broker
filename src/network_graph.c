@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 
-#include <libwebsockets/cJSON/cJSON.h>
+#include <../cJSON/cJSON.h>
 
 #include "mosquitto_broker_internal.h"
 #include "mosquitto.h"
@@ -1065,10 +1065,8 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                         pub_edge_temp->bytes = 0;
                         pub_edge_temp->bytes_per_sec = round3(temp_bytes);
 
-                        if (pub_edge_temp->bytes_per_sec == 0.0) {
-                            if (--pub_edge_temp->til_delete <= 0) {
-                                graph_delete_pub(client, pub_edge_temp);
-                            }
+                        if (pub_edge_temp->bytes_per_sec == 0.0 && --pub_edge_temp->til_delete <= 0) {
+                            graph_delete_pub(client, pub_edge_temp);
                         }
                         else {
                             // update outgoing bytes/s from client
