@@ -4,7 +4,7 @@ import time, random, string
 def rand_str(N):
     return ''.join(random.choice(string.ascii_lowercase+string.digits) for i in range(N))
 
-broker = "127.0.0.1"
+broker = "oz.andrew.cmu.edu"
 port = 9001
 
 clients = []
@@ -60,4 +60,4 @@ while False == False:
         if topic not in shared_topics:
             sub_topics.remove(topic)
 
-    time.sleep(1)
+    time.sleep(0.1)

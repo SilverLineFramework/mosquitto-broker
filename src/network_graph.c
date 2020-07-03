@@ -138,6 +138,7 @@ static struct ip_container *create_ip_container(const char *ip) {
 static struct client *create_client(const char *id, const char *address) {
     struct client *client = (struct client *)mosquitto__malloc(sizeof(struct client));
     if (!client) return NULL;
+    client->latency_ready = true;
     client->json = create_client_json(id, address);
     client->pub_list = NULL;
     client->next = NULL;
@@ -871,7 +872,10 @@ int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) 
 /*
  * Called after sending PUBREL
  */
-int network_graph_latency_start(struct mosquitto *context) {
+int network_graph_latency_start(struct mosquitto *context, const char *topic) {
+    // do not update latency if topic is not $GRAPH/latency
+    if (strncmp(topic, "$GRAPH/latency", 15) != 0) return 0;
+
     char *address, *id;
     struct ip_container *ip_cont;
     struct client *client;
@@ -895,8 +899,7 @@ int network_graph_latency_start(struct mosquitto *context) {
     }
 
     client->latency = (double)mosquitto_time_ns();
-
-    graph->changed = true;
+    client->latency_ready = false;
 
     return 0;
 }
@@ -928,11 +931,13 @@ int network_graph_latency_end(struct mosquitto *context) {
         return -1;
     }
 
-    client->latency = (double)(mosquitto_time_ns() - client->latency) / 1000;
-    data = cJSON_GetObjectItem(client->json, "data");
-    cJSON_SetNumberValue(cJSON_GetObjectItem(data, "latency"), client->latency);
-
-    graph->changed = true;
+    if (!client->latency_ready) {
+        client->latency = (double)(mosquitto_time_ns() - client->latency) / 1000;
+        data = cJSON_GetObjectItem(client->json, "data");
+        cJSON_SetNumberValue(cJSON_GetObjectItem(data, "latency"), client->latency);
+        client->latency_ready = false;
+        graph->changed = true;
+    }
 
     return 0;
 }
@@ -969,13 +974,15 @@ int network_graph_delete_client(struct mosquitto *context) {
  */
 static inline void unlink_json() {
     cJSON *elem, *temp;
-    elem = graph->json->child;
-    while (elem != NULL) {
-        temp = elem;
-        elem = elem->next;
-        temp->next = NULL;
+    if (graph->json != NULL) {
+        elem = graph->json->child;
+        while (elem != NULL) {
+            temp = elem;
+            elem = elem->next;
+            temp->next = NULL;
+        }
+        graph->json->child = NULL;
     }
-    graph->json->child = NULL;
 }
 
 static inline double round3(double num) {
@@ -1070,12 +1077,12 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
 
         // send out the updated graph to $GRAPH topic
         json_buf = cJSON_PrintUnformatted(graph->json);
-        if (graph->changed) {
+        if (json_buf != NULL && graph->changed) {
             db__messages_easy_queue(db, NULL, "$GRAPH", 2, strlen(json_buf), json_buf, 1, 0, NULL);
             log__printf(NULL, MOSQ_LOG_DEBUG, "%s", json_buf);
             graph->changed = false;
+            cJSON_free(json_buf);
         }
-        free(json_buf);
         unlink_json();
 
         last_update = mosquitto_time();

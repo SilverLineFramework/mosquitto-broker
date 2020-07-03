@@ -348,7 +348,7 @@ int handle__publish(struct mosquitto_db *db, struct mosquitto *context)
 				rc = 1;
 			}
 #ifdef WITH_GRAPH
-			network_graph_latency_start(context);
+			network_graph_latency_start(context, topic);
 #endif
 			break;
 	}

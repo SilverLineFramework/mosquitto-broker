@@ -41,6 +41,7 @@ struct topic {
 };
 
 struct client {
+    bool latency_ready;
     cJSON *json;
     struct client *next;
     struct client *prev;
@@ -84,7 +85,7 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic);
 int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uint32_t payloadlen);
 int network_graph_delete_client(struct mosquitto *context);
 int network_graph_delete_subtopic(struct mosquitto *context, const char *topic);
-int network_graph_latency_start(struct mosquitto *context);
+int network_graph_latency_start(struct mosquitto *context, const char *topic);
 int network_graph_latency_end(struct mosquitto *context);
 void network_graph_update(struct mosquitto_db *db, int interval);
 void network_graph_pub(struct mosquitto_db *db);
