@@ -1,7 +1,7 @@
 #ifndef NETWORK_GRAPH_H
 #define NETWORK_GRAPH_H
 
-#include <../cJSON/cJSON.h>
+#include <libwebsockets/cJSON/cJSON.h>
 
 #include "mosquitto.h"
 

@@ -3,7 +3,7 @@
 #include <string.h>
 #include <math.h>
 
-#include <../cJSON/cJSON.h>
+#include <libwebsockets/cJSON/cJSON.h>
 
 #include "mosquitto_broker_internal.h"
 #include "mosquitto.h"
@@ -23,7 +23,8 @@ const char *edge_class = "connections";
 
 /*****************************************************************************/
 
-struct network_graph *graph = NULL;
+static struct network_graph *graph = NULL;
+static cJSON_Hooks *hooks = NULL;
 
 /*****************************************************************************/
 
@@ -641,6 +642,11 @@ int network_graph_init(struct mosquitto_db *db) {
     graph->topic_dict->max_size = 1;
     graph->topic_dict->used = 0;
 
+    hooks = (cJSON_Hooks *)mosquitto__malloc(sizeof(cJSON_Hooks));
+    hooks->malloc_fn = mosquitto__malloc;
+    hooks->free_fn = mosquitto__free;
+    cJSON_InitHooks(hooks);
+
     return 0;
 }
 
@@ -685,6 +691,8 @@ int network_graph_cleanup(void) {
     mosquitto__free(graph->topic_dict->topic_list);
     mosquitto__free(graph->topic_dict);
     mosquitto__free(graph);
+
+    cJSON_free(hooks);
     return 0;
 }
 
@@ -969,24 +977,22 @@ int network_graph_delete_client(struct mosquitto *context) {
     return 0;
 }
 
+static inline double round3(double num) {
+    return (double)((int)(num * 1000 + 0.5)) / 1000;
+}
+
 /*
  * Unlink all cJSON nodes from a cJSON array
  */
 static inline void unlink_json() {
     cJSON *elem, *temp;
-    if (graph->json != NULL) {
-        elem = graph->json->child;
-        while (elem != NULL) {
-            temp = elem;
-            elem = elem->next;
-            temp->next = NULL;
-        }
-        graph->json->child = NULL;
+    elem = graph->json->child;
+    while (elem != NULL) {
+        temp = elem;
+        elem = elem->next;
+        temp->next = NULL;
     }
-}
-
-static inline double round3(double num) {
-    return (double)((int)(num * 1000 + 0.5)) / 1000;
+    graph->json->child = NULL;
 }
 
 /*
@@ -1081,8 +1087,8 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
             db__messages_easy_queue(db, NULL, "$GRAPH", 2, strlen(json_buf), json_buf, 1, 0, NULL);
             log__printf(NULL, MOSQ_LOG_DEBUG, "%s", json_buf);
             graph->changed = false;
-            cJSON_free(json_buf);
         }
+        cJSON_free(json_buf);
         unlink_json();
 
         last_update = mosquitto_time();
