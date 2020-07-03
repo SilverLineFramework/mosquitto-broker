@@ -626,7 +626,6 @@ int network_graph_init(struct mosquitto_db *db) {
 
     graph->changed = false;
     graph->til_delete = db->config->graph_del_mult;
-    graph->json = cJSON_CreateArray();
 
     graph->ip_dict = (struct ip_dict *)mosquitto__malloc(sizeof(struct ip_dict));
     if (!graph->ip_dict) return -1;
@@ -685,7 +684,6 @@ int network_graph_cleanup(void) {
         }
     }
 
-    cJSON_Delete(graph->json);
     mosquitto__free(graph->ip_dict->ip_list);
     mosquitto__free(graph->ip_dict);
     mosquitto__free(graph->topic_dict->topic_list);
@@ -801,7 +799,7 @@ int network_graph_add_subtopic(struct mosquitto *context, const char *topic) {
         address = context->bridge->addresses[context->bridge->cur_address].address;
     }
     else {
-        address = context->address; // id is null
+        address = context->address;
     }
     id = context->id;
 
@@ -982,27 +980,13 @@ static inline double round3(double num) {
 }
 
 /*
- * Unlink all cJSON nodes from a cJSON array
- */
-static inline void unlink_json() {
-    cJSON *elem, *temp;
-    elem = graph->json->child;
-    while (elem != NULL) {
-        temp = elem;
-        elem = elem->next;
-        temp->next = NULL;
-    }
-    graph->json->child = NULL;
-}
-
-/*
  * Called every graph->interval seconds
  */
 void network_graph_update(struct mosquitto_db *db, int interval) {
     static time_t last_update = 0;
 
     char *json_buf;
-    cJSON *data;
+    cJSON *root, *data;
 
     struct ip_container *ip_cont;
     struct client *client;
@@ -1014,6 +998,8 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
     time_t now = mosquitto_time();
 
     if (interval && now - interval > last_update) {
+        root = cJSON_CreateArray();
+
         // graph has a list of all topics that are pubbed
         for (size_t i = 0; i < graph->topic_dict->max_size; ++i) {
             topic = graph->topic_dict->topic_list[i];
@@ -1024,11 +1010,11 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                     graph_delete_topic(temp);
                 }
                 else {
-                    cJSON_AddItemToArray(graph->json, topic->json);
+                    cJSON_AddItemToArray(root, cJSON_Duplicate(topic->json, true));
 
                     // update incoming bytes/s to topic
-                    temp_bytes = (double)topic->total_bytes / (now - last_update);
-                    topic->total_bytes = 0;
+                    temp_bytes = (double)topic->bytes / (now - last_update);
+                    topic->bytes = 0;
 
                     topic->bytes_per_sec = round3(temp_bytes);
                     sub_edge = topic->sub_list;
@@ -1038,7 +1024,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                         // update outgoing bytes/s from topic
                         data = cJSON_GetObjectItem(sub_edge->json, "data");
                         cJSON_SetNumberValue(cJSON_GetObjectItem(data, "bps"), topic->bytes_per_sec);
-                        cJSON_AddItemToArray(graph->json, sub_edge->json);
+                        cJSON_AddItemToArray(root, cJSON_Duplicate(sub_edge->json, true));
                     }
                     topic = topic->next;
                 }
@@ -1050,11 +1036,11 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
             ip_cont = graph->ip_dict->ip_list[i];
 
             for (; ip_cont != NULL; ip_cont = ip_cont->next) {
-                cJSON_AddItemToArray(graph->json, ip_cont->json);
+                cJSON_AddItemToArray(root, cJSON_Duplicate(ip_cont->json, true));
 
                 client = ip_cont->client_list; // each IP address holds a list of clients
                 for (; client != NULL; client = client->next) {
-                    cJSON_AddItemToArray(graph->json, client->json);
+                    cJSON_AddItemToArray(root, cJSON_Duplicate(client->json, true));
 
                     pub_edge = client->pub_list;
                     while (pub_edge != NULL) { // client may have published topics
@@ -1072,7 +1058,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                             // update outgoing bytes/s from client
                             data = cJSON_GetObjectItem(pub_edge_temp->json, "data");
                             cJSON_SetNumberValue(cJSON_GetObjectItem(data, "bps"), pub_edge_temp->bytes_per_sec);
-                            cJSON_AddItemToArray(graph->json, pub_edge_temp->json);
+                            cJSON_AddItemToArray(root, cJSON_Duplicate(pub_edge_temp->json, true));
                         }
                     }
                 }
@@ -1080,14 +1066,14 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
         }
 
         // send out the updated graph to $GRAPH topic
-        json_buf = cJSON_PrintUnformatted(graph->json);
+        json_buf = cJSON_PrintUnformatted(root);
         if (json_buf != NULL && graph->changed) {
             db__messages_easy_queue(db, NULL, "$GRAPH", 2, strlen(json_buf), json_buf, 1, 0, NULL);
             log__printf(NULL, MOSQ_LOG_DEBUG, "%s", json_buf);
             graph->changed = false;
         }
         cJSON_free(json_buf);
-        unlink_json();
+        cJSON_Delete(root);
 
         last_update = mosquitto_time();
     }

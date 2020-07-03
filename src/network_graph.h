@@ -72,7 +72,6 @@ struct topic_dict {
 
 struct network_graph {
     bool changed;
-    cJSON *json;
     char til_delete;
     struct ip_dict *ip_dict;
     struct topic_dict *topic_dict;

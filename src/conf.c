@@ -200,7 +200,7 @@ static void config__init_reload(struct mosquitto_db *db, struct mosquitto__confi
 	config->retain_available = true;
 	config->set_tcp_nodelay = false;
 	config->sys_interval = 10;
-	config->graph_interval = 60;
+	config->graph_interval = 30;
 	config->graph_del_mult = 2;
 	config->upgrade_outgoing_qos = false;
 
