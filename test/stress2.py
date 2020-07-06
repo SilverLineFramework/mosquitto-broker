@@ -4,8 +4,8 @@ import time, random, string
 def rand_str(N):
     return ''.join(random.choice(string.ascii_lowercase+string.digits) for i in range(N))
 
-broker = "spatial.andrew.cmu.edu"
-port = 9000
+broker = "localhost"
+port = 9001
 
 clients = []
 start_topic = "initial/topic"
@@ -22,7 +22,9 @@ while False == False:
         print "added new client"
         new_client.connect(broker, port)
         new_client.loop_start()
+
         clients += [new_client]
+        new_client.publish("$GRAPH/latency", None, qos=2, retain=False)
 
     elif len(clients) >= 10 and num <= 5: # disconnect
         client = random.choice(clients)
@@ -40,7 +42,7 @@ while False == False:
         pub_to = random.choice([random.choice(shared_topics), topic])
         pub_topics += [pub_to]
         print "pubbed to", pub_to
-        client.publish(pub_to, rand_str(random.randint(100,1000)), retain=False)
+        client.publish(pub_to, rand_str(random.randint(10,100)), retain=False)
 
     elif len(clients) > 0 and num <= 70: # sub
         client = random.choice(clients)
