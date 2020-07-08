@@ -1010,6 +1010,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
 
                         if (pub_edge_temp->bytes_per_sec == 0.0 && --pub_edge_temp->til_delete <= 0) {
                             graph_delete_pub(client, pub_edge_temp);
+                            graph->changed = true;
                         }
                         else {
                             // update outgoing bytes/s from client and add json
@@ -1030,6 +1031,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                     temp = topic;
                     topic = topic->next;
                     graph_delete_topic(temp);
+                    graph->changed = true;
                 }
                 else {
                     cJSON_AddItemToArray(root, cJSON_Duplicate(topic->json, true));
