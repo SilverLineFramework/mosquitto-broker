@@ -117,6 +117,7 @@ static cJSON *create_topic_json(const char *topic) {
     root = create_generic_json(topic);
     data = cJSON_GetObjectItem(root, "data");
 
+    cJSON_AddNumberToObject(data, "totalBytes", 0);
     cJSON_AddItemToObject(data, "class", cJSON_CreateString(topic_class));
     cJSON_AddItemToObject(root, "group", cJSON_CreateString("nodes"));
 
@@ -143,7 +144,7 @@ static struct ip_container *create_ip_container(const char *ip) {
 static struct client *create_client(const char *id, const char *address) {
     struct client *client = (struct client *)mosquitto__malloc(sizeof(struct client));
     if (!client) return NULL;
-    client->latency_ready = true;
+    client->latency_ready = false;
     client->latency_total = 0;
     client->latency_cnt = 0;
     client->json = create_client_json(id, address);
@@ -741,6 +742,7 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
     struct client *client;
     struct topic *topic_vert;
     struct pub_edge *pub_edge;
+    cJSON *data;
 
     address = context->address;
 #ifdef WITH_BROKER
@@ -780,8 +782,13 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
     if (payloadlen > 0) {
         topic_vert->bytes += payloadlen;
         topic_vert->total_bytes += (uint64_t)payloadlen;
+
+        data = cJSON_GetObjectItem(topic_vert->json, "data");
+        cJSON_SetNumberValue(cJSON_GetObjectItem(data, "totalBytes"), topic_vert->total_bytes);
+
         pub_edge->bytes += payloadlen;
         pub_edge->total_bytes += (uint64_t)payloadlen;
+
         graph->changed = true;
     }
 
@@ -900,7 +907,7 @@ int network_graph_latency_start(struct mosquitto *context, const char *topic) {
     }
 
     client->latency = mosquitto_time_ns();
-    client->latency_ready = false;
+    client->latency_ready = true;
 
     return 0;
 }
@@ -933,7 +940,7 @@ int network_graph_latency_end(struct mosquitto *context) {
         return -1;
     }
 
-    if (!client->latency_ready) {
+    if (client->latency_ready) {
         client->latency = (mosquitto_time_ns() - client->latency);
         client->latency_total += client->latency;
         ++client->latency_cnt;

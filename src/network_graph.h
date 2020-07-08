@@ -22,7 +22,7 @@ struct pub_edge {
     struct pub_edge *next;
     struct pub_edge *prev;
     uint16_t bytes;
-    uint64_t total_bytes;
+    uint32_t total_bytes;
     double bytes_per_sec;
 };
 
@@ -36,7 +36,7 @@ struct topic {
     unsigned long hash;             // hash(full_name)
     uint16_t ref_cnt;               // # of clients pubbed to topic
     uint16_t bytes;
-    uint64_t total_bytes;
+    uint32_t total_bytes;
     double bytes_per_sec;
 };
 
