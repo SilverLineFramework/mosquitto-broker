@@ -40,6 +40,10 @@ static unsigned long sdbm_hash(const char *str) {
     return hash;
 }
 
+static inline double round3(double num) {
+    return (double)((int)(num * 1000 + 0.5)) / 1000;
+}
+
 /*
  * Creates a template cJSON struct to be used by all nodes/edges
  */
@@ -140,6 +144,8 @@ static struct client *create_client(const char *id, const char *address) {
     struct client *client = (struct client *)mosquitto__malloc(sizeof(struct client));
     if (!client) return NULL;
     client->latency_ready = true;
+    client->latency_total = 0;
+    client->latency_cnt = 0;
     client->json = create_client_json(id, address);
     client->pub_list = NULL;
     client->next = NULL;
@@ -154,7 +160,7 @@ static struct client *create_client(const char *id, const char *address) {
 static struct topic *create_topic(const char *name) {
     struct topic *topic = (struct topic *)mosquitto__malloc(sizeof(struct topic));
     if (!topic) return NULL;
-    topic->til_delete = 0;
+    topic->ttl_cnt = 0;
     topic->json = create_topic_json(name);
     topic->next = NULL;
     topic->prev = NULL;
@@ -192,7 +198,7 @@ static struct pub_edge *create_pub_edge(const char *src, const char *tgt, struct
     if (topic == NULL) return NULL;
     struct pub_edge *pub_edge = (struct pub_edge *)mosquitto__malloc(sizeof(struct pub_edge));
     if (!pub_edge) return NULL;
-    pub_edge->til_delete = 0;
+    pub_edge->ttl_cnt = 0;
     pub_edge->json = create_edge_json(src, tgt);
     pub_edge->pub = topic;
     pub_edge->next = NULL;
@@ -508,7 +514,7 @@ static int graph_add_pub_edge(struct client *client, struct pub_edge *pub_edge) 
  */
 static int pub_edge_decr_ref_cnt(struct pub_edge *pub_edge) {
     if (--pub_edge->pub->ref_cnt == 0) {
-        pub_edge->pub->til_delete = graph->til_delete;
+        pub_edge->pub->ttl_cnt = graph->ttl_cnt;
     }
     return 0;
 }
@@ -627,7 +633,7 @@ int network_graph_init(struct mosquitto_db *db) {
     if (!graph) return -1;
 
     graph->changed = false;
-    graph->til_delete = db->config->graph_del_mult;
+    graph->ttl_cnt = db->config->graph_del_mult;
 
     graph->ip_dict = (struct ip_dict *)mosquitto__malloc(sizeof(struct ip_dict));
     if (!graph->ip_dict) return -1;
@@ -769,7 +775,7 @@ int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uin
         graph_add_pub_edge(client, pub_edge);
     }
 
-    pub_edge->til_delete = graph->til_delete;
+    pub_edge->ttl_cnt = graph->ttl_cnt;
 
     if (payloadlen > 0) {
         topic_vert->bytes += payloadlen;
@@ -893,7 +899,7 @@ int network_graph_latency_start(struct mosquitto *context, const char *topic) {
         return -1;
     }
 
-    client->latency = (double)mosquitto_time_ns();
+    client->latency = mosquitto_time_ns();
     client->latency_ready = false;
 
     return 0;
@@ -907,6 +913,7 @@ int network_graph_latency_end(struct mosquitto *context) {
     struct ip_container *ip_cont;
     struct client *client;
     cJSON *data;
+    double latency_avg_ns; // average latency in ns
 
     address = context->address;
 #ifdef WITH_BROKER
@@ -927,10 +934,17 @@ int network_graph_latency_end(struct mosquitto *context) {
     }
 
     if (!client->latency_ready) {
-        client->latency = (double)(mosquitto_time_ns() - client->latency) / 1000;
+        client->latency = (mosquitto_time_ns() - client->latency);
+        client->latency_total += client->latency;
+        ++client->latency_cnt;
+
+        latency_avg_ns = (double)client->latency_total / client->latency_cnt;
+
         data = cJSON_GetObjectItem(client->json, "data");
-        cJSON_SetNumberValue(cJSON_GetObjectItem(data, "latency"), client->latency);
+        cJSON_SetNumberValue(cJSON_GetObjectItem(data, "latency"),
+                             round3(latency_avg_ns / 1000)); // ns -> ms
         client->latency_ready = false;
+
         graph->changed = true;
     }
 
@@ -962,10 +976,6 @@ int network_graph_delete_client(struct mosquitto *context) {
     graph->changed = true;
 
     return 0;
-}
-
-static inline double round3(double num) {
-    return (double)((int)(num * 1000 + 0.5)) / 1000;
 }
 
 /*
@@ -1008,7 +1018,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                         pub_edge_temp->bytes = 0;
                         pub_edge_temp->bytes_per_sec = round3(temp_bytes);
 
-                        if (pub_edge_temp->bytes_per_sec == 0.0 && --pub_edge_temp->til_delete <= 0) {
+                        if (pub_edge_temp->bytes_per_sec == 0.0 && --pub_edge_temp->ttl_cnt <= 0) {
                             graph_delete_pub(client, pub_edge_temp);
                             graph->changed = true;
                         }
@@ -1027,7 +1037,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
         for (size_t i = 0; i < graph->topic_dict->max_size; ++i) {
             topic = graph->topic_dict->topic_list[i];
             while (topic != NULL) {
-                if (topic->ref_cnt == 0 && --topic->til_delete <= 0) {
+                if (topic->ref_cnt == 0 && --topic->ttl_cnt <= 0) {
                     temp = topic;
                     topic = topic->next;
                     graph_delete_topic(temp);

@@ -16,37 +16,39 @@ struct sub_edge {
 };
 
 struct pub_edge {
-    int til_delete;                 // "delete counter", if == 0, delete
+    int ttl_cnt;                    // "time to live counter", if == 0, delete
     cJSON *json;                    // edge JSON
     struct topic *pub;              // pointer to topic that is client is pubbed to
     struct pub_edge *next;
     struct pub_edge *prev;
-    uint32_t bytes;
+    uint16_t bytes;
     uint64_t total_bytes;
     double bytes_per_sec;
 };
 
 struct topic {
-    int til_delete;                 // "delete counter", if == 0, delete
+    int ttl_cnt;                    // "ttl counter", if == 0, delete
     cJSON *json;
     struct topic *next;
     struct topic *prev;
     struct sub_edge *sub_list;      // list of all subscriptions
     char *full_name;                // full topic name
     unsigned long hash;             // hash(full_name)
-    unsigned int ref_cnt;           // # of clients pubbed to topic
-    uint32_t bytes;
+    uint16_t ref_cnt;               // # of clients pubbed to topic
+    uint16_t bytes;
     uint64_t total_bytes;
     double bytes_per_sec;
 };
 
 struct client {
     bool latency_ready;
+    uint16_t latency_cnt;           // num times latency has been recved
     cJSON *json;
     struct client *next;
     struct client *prev;
     struct pub_edge *pub_list;      // current topic client is pubbing to
-    double latency;                 // ms
+    time_t latency;                 // ns
+    time_t latency_total;           // ns
     unsigned long hash;             // hash(client_id)
 };
 
@@ -72,7 +74,7 @@ struct topic_dict {
 
 struct network_graph {
     bool changed;
-    char til_delete;
+    char ttl_cnt;
     struct ip_dict *ip_dict;
     struct topic_dict *topic_dict;
 };
