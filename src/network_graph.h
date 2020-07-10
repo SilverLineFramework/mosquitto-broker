@@ -22,21 +22,20 @@ struct pub_edge {
     struct pub_edge *next;
     struct pub_edge *prev;
     uint16_t bytes;
-    uint32_t total_bytes;
     double bytes_per_sec;
 };
 
 struct topic {
+    uint8_t retain;
     int ttl_cnt;                    // "ttl counter", if == 0, delete
     cJSON *json;
     struct topic *next;
     struct topic *prev;
     struct sub_edge *sub_list;      // list of all subscriptions
     char *full_name;                // full topic name
-    unsigned long hash;             // hash(full_name)
     uint16_t ref_cnt;               // # of clients pubbed to topic
     uint16_t bytes;
-    uint32_t total_bytes;
+    unsigned long hash;             // hash(full_name)
     double bytes_per_sec;
 };
 
@@ -74,7 +73,6 @@ struct topic_dict {
 
 struct network_graph {
     bool changed;
-    char ttl_cnt;
     struct ip_dict *ip_dict;
     struct topic_dict *topic_dict;
 };
@@ -82,8 +80,8 @@ struct network_graph {
 int network_graph_init(struct mosquitto_db *db);
 int network_graph_cleanup(void);
 int network_graph_add_client(struct mosquitto *context);
-int network_graph_add_subtopic(struct mosquitto *context, const char *topic);
-int network_graph_add_pubtopic(struct mosquitto *context, const char *topic, uint32_t payloadlen);
+int network_graph_add_sub_edge(struct mosquitto *context, const char *topic);
+int network_graph_add_topic(struct mosquitto *context, uint8_t retain, const char *topic, uint32_t payloadlen);
 int network_graph_delete_client(struct mosquitto *context);
 int network_graph_delete_subtopic(struct mosquitto *context, const char *topic);
 int network_graph_latency_start(struct mosquitto *context, const char *topic);
