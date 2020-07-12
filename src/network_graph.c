@@ -1,14 +1,19 @@
-#include <assert.h>
-#include <stdio.h>
 #include <string.h>
 #include <math.h>
-
 #include <../cJSON/cJSON.h>
+
+#  if defined(__APPLE__)
+#    include <malloc/malloc.h>
+#    define malloc_usable_size malloc_size
+#  elif defined(__FreeBSD__)
+#    include <malloc_np.h>
+#  else
+#    include <malloc.h>
+#  endif
 
 #include "mosquitto_broker_internal.h"
 #include "mosquitto.h"
 #include "memory_mosq.h"
-#include "packet_mosq.h"
 #include "sys_tree.h"
 #include "network_graph.h"
 
@@ -26,9 +31,14 @@ const char *topic_class = "topic";
 static struct network_graph *graph = NULL;
 static cJSON_Hooks *hooks = NULL;
 static int ttl_cnt = 0;
-static unsigned long max_heap = 0;
+static unsigned long memcount = 0;
+static unsigned long max_memcount = 0;
 
 /*****************************************************************************/
+
+static inline double round3(double num) {
+    return (double)((int)(num * 1000 + 0.5)) / 1000;
+}
 
 /*
  * General purpose hash function
@@ -42,14 +52,60 @@ static unsigned long sdbm_hash(const char *str) {
     return hash;
 }
 
-static inline double round3(double num) {
-    return (double)((int)(num * 1000 + 0.5)) / 1000;
+/*
+ * Malloc wrapper for counting graph memory usage
+ */
+void *graph__malloc(size_t len) {
+    void *mem = mosquitto__malloc(len);
+    if (mem != NULL) {
+        memcount += malloc_usable_size(mem);
+        if (memcount > max_memcount){
+			max_memcount = memcount;
+		}
+    }
+    return mem;
 }
 
-void *graph__malloc(size_t len) {
-    max_heap += len;
-	return mosquitto__malloc(len);
+/*
+ * Calloc wrapper for counting graph memory usage
+ */
+void *graph__calloc(size_t nmemb, size_t size) {
+	void *mem = mosquitto__calloc(nmemb, size);
+    if (mem != NULL) {
+        memcount += malloc_usable_size(mem);
+        if (memcount > max_memcount){
+			max_memcount = memcount;
+		}
+    }
+    return mem;
 }
+
+/*
+ * Free wrapper for counting graph memory usage
+ */
+void graph__free(void *mem) {
+	if (mem == NULL) {
+		return;
+	}
+	memcount -= malloc_usable_size(mem);
+	mosquitto__free(mem);
+}
+
+/*
+ * Strdup wrapper for counting graph memory usage
+ */
+char *graph__strdup(const char *s) {
+	char *str = mosquitto__strdup(s);
+	if (str != NULL) {
+		memcount += malloc_usable_size(str);
+        if (memcount > max_memcount){
+			max_memcount = memcount;
+		}
+	}
+	return str;
+}
+
+/*****************************************************************************/
 
 /*
  * Creates a template cJSON struct to be used by all nodes/edges
@@ -172,7 +228,7 @@ static struct topic *create_topic(const char *name, uint8_t retain) {
     topic->next = NULL;
     topic->prev = NULL;
     topic->sub_list = NULL;
-    topic->full_name = strdup(name);
+    topic->full_name = graph__strdup(name);
     topic->hash = sdbm_hash(name);
     topic->ref_cnt = 0;
     topic->bytes = 0;
@@ -236,7 +292,7 @@ static int graph_set_ip_dict_size(unsigned int new_size) {
     size_t idx;
     struct ip_container **ip_list_copy, *temp;
     ip_list_copy = graph->ip_dict->ip_list;
-    graph->ip_dict->ip_list = (struct ip_container **)mosquitto__calloc(new_size, sizeof(struct ip_container *));
+    graph->ip_dict->ip_list = (struct ip_container **)graph__calloc(new_size, sizeof(struct ip_container *));
     if (graph->ip_dict->ip_list == NULL) return -1;
 
     // rehash all elems of old dict and place them in new dict
@@ -255,7 +311,7 @@ static int graph_set_ip_dict_size(unsigned int new_size) {
     }
     graph->ip_dict->max_size = new_size;
 
-    mosquitto__free(ip_list_copy);
+    graph__free(ip_list_copy);
 
     return 0;
 }
@@ -370,7 +426,7 @@ static int graph_set_topic_dict_size(unsigned int new_size) {
     size_t idx;
     struct topic **topic_list_copy, *temp;
     topic_list_copy = graph->topic_dict->topic_list;
-    graph->topic_dict->topic_list = (struct topic **)mosquitto__calloc(new_size, sizeof(struct topic *));
+    graph->topic_dict->topic_list = (struct topic **)graph__calloc(new_size, sizeof(struct topic *));
     if (graph->topic_dict->topic_list == NULL) return -1;
 
     // rehash all elems of old dict and place them in new dict
@@ -389,7 +445,7 @@ static int graph_set_topic_dict_size(unsigned int new_size) {
     }
     graph->topic_dict->max_size = new_size;
 
-    mosquitto__free(topic_list_copy);
+    graph__free(topic_list_copy);
 
     return 0;
 }
@@ -423,7 +479,7 @@ static int graph_delete_topic_sub_edges(struct topic *topic) {
         temp = curr;
         curr = curr->next;
         cJSON_Delete(temp->json);
-        mosquitto__free(temp);
+        graph__free(temp);
     }
     topic->sub_list = NULL;
     return 0;
@@ -452,8 +508,8 @@ static int graph_delete_topic(struct topic *topic) {
     graph_detach_topic(topic);
     graph_delete_topic_sub_edges(topic);
     cJSON_Delete(topic->json);
-    mosquitto__free(topic->full_name);
-    mosquitto__free(topic);
+    graph__free(topic->full_name);
+    graph__free(topic);
 
     // if (graph->topic_dict->used < graph->topic_dict->max_size / 4) {
     //     graph_set_topic_dict_size(graph->topic_dict->max_size / 2);
@@ -488,7 +544,7 @@ static int graph_delete_sub(struct topic *topic, struct sub_edge *sub_edge) {
         sub_edge->prev->next = sub_edge->next;
     }
     cJSON_Delete(sub_edge->json);
-    mosquitto__free(sub_edge);
+    graph__free(sub_edge);
     return 0;
 }
 
@@ -539,7 +595,7 @@ static int graph_delete_client_pub_edges(struct client *client) {
         curr = curr->next;
         pub_edge_decr_ref_cnt(temp);
         cJSON_Delete(temp->json);
-        mosquitto__free(temp);
+        graph__free(temp);
     }
     client->pub_list = NULL;
     return 0;
@@ -560,7 +616,7 @@ static int graph_delete_pub(struct client *client, struct pub_edge *pub_edge) {
     }
     pub_edge_decr_ref_cnt(pub_edge);
     cJSON_Delete(pub_edge->json);
-    mosquitto__free(pub_edge);
+    graph__free(pub_edge);
     return 0;
 }
 
@@ -589,7 +645,7 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
         ip_cont->prev->next = ip_cont->next;
     }
     cJSON_Delete(ip_cont->json);
-    mosquitto__free(ip_cont);
+    graph__free(ip_cont);
 
     // if (graph->ip_dict->used < graph->ip_dict->max_size / 4) {
     //     graph_set_ip_dict_size(graph->ip_dict->max_size / 2);
@@ -628,7 +684,7 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
 
     graph_delete_client_pub_edges(client);
     cJSON_Delete(client->json);
-    mosquitto__free(client);
+    graph__free(client);
     return 0;
 }
 
@@ -647,21 +703,21 @@ int network_graph_init(struct mosquitto_db *db) {
 
     graph->ip_dict = (struct ip_dict *)graph__malloc(sizeof(struct ip_dict));
     if (!graph->ip_dict) return -1;
-    graph->ip_dict->ip_list = (struct ip_container **)mosquitto__calloc(1, sizeof(struct ip_container *));
+    graph->ip_dict->ip_list = (struct ip_container **)graph__calloc(1, sizeof(struct ip_container *));
     if (!graph->ip_dict->ip_list) return -1;
     graph->ip_dict->max_size = 1;
     graph->ip_dict->used = 0;
 
     graph->topic_dict = (struct topic_dict *)graph__malloc(sizeof(struct topic_dict));
     if (!graph->topic_dict) return -1;
-    graph->topic_dict->topic_list = (struct topic **)mosquitto__calloc(1, sizeof(struct topic *));
+    graph->topic_dict->topic_list = (struct topic **)graph__calloc(1, sizeof(struct topic *));
     if (!graph->topic_dict->topic_list) return -1;
     graph->topic_dict->max_size = 1;
     graph->topic_dict->used = 0;
 
     hooks = (cJSON_Hooks *)graph__malloc(sizeof(cJSON_Hooks));
     hooks->malloc_fn = graph__malloc;
-    hooks->free_fn = mosquitto__free;
+    hooks->free_fn = graph__free;
     cJSON_InitHooks(hooks);
 
     return 0;
@@ -681,12 +737,12 @@ int network_graph_cleanup(void) {
                 client = client->next;
                 graph_delete_client_pub_edges(client_temp);
                 cJSON_Delete(client_temp->json);
-                mosquitto__free(client_temp);
+                graph__free(client_temp);
             }
             ip_temp = ip_curr;
             ip_curr = ip_curr->next;
             cJSON_Delete(ip_temp->json);
-            mosquitto__free(ip_temp);
+            graph__free(ip_temp);
         }
     }
 
@@ -698,15 +754,15 @@ int network_graph_cleanup(void) {
             graph_delete_topic_sub_edges(topic_temp);
             cJSON_Delete(topic_temp->json);
             free(topic_temp->full_name);
-            mosquitto__free(topic_temp);
+            graph__free(topic_temp);
         }
     }
 
-    mosquitto__free(graph->ip_dict->ip_list);
-    mosquitto__free(graph->ip_dict);
-    mosquitto__free(graph->topic_dict->topic_list);
-    mosquitto__free(graph->topic_dict);
-    mosquitto__free(graph);
+    graph__free(graph->ip_dict->ip_list);
+    graph__free(graph->ip_dict);
+    graph__free(graph->topic_dict->topic_list);
+    graph__free(graph->topic_dict);
+    graph__free(graph);
 
     cJSON_free(hooks);
     return 0;
@@ -994,6 +1050,7 @@ int network_graph_delete_client(struct mosquitto *context) {
 void network_graph_update(struct mosquitto_db *db, int interval) {
     static time_t last_update = 0;
     static unsigned long current_heap = -1;
+    static unsigned long max_heap = -1;
 
     time_t now = mosquitto_time();
 
@@ -1094,9 +1151,16 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
         cJSON_free(json_buf);
         cJSON_Delete(root);
 
-        if (current_heap != max_heap) {
-            current_heap = max_heap;
+        if (current_heap != memcount) {
+            current_heap = memcount;
             snprintf(heap_buf, BUFLEN, "%lu", current_heap);
+            log__printf(NULL, MOSQ_LOG_NOTICE, "%lu", current_heap);
+            db__messages_easy_queue(db, NULL, "$GRAPH/heap/current", 2, strlen(heap_buf), heap_buf, 1, 0, NULL);
+        }
+
+        if (max_heap != memcount) {
+            max_heap = max_memcount;
+            snprintf(heap_buf, BUFLEN, "%lu", max_heap);
             db__messages_easy_queue(db, NULL, "$GRAPH/heap/maximum", 2, strlen(heap_buf), heap_buf, 1, 0, NULL);
         }
 
