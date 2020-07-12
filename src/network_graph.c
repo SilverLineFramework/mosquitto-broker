@@ -458,7 +458,7 @@ static int graph_delete_topic(struct topic *topic) {
     // if (graph->topic_dict->used < graph->topic_dict->max_size / 4) {
     //     graph_set_topic_dict_size(graph->topic_dict->max_size / 2);
     // }
-    // --graph->topic_dict->used;
+    --graph->topic_dict->used;
     return 0;
 }
 
@@ -594,7 +594,7 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
     // if (graph->ip_dict->used < graph->ip_dict->max_size / 4) {
     //     graph_set_ip_dict_size(graph->ip_dict->max_size / 2);
     // }
-    // --graph->ip_dict->used;
+    --graph->ip_dict->used;
     return 0;
 }
 
