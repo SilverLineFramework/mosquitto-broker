@@ -57,7 +57,7 @@ static unsigned long sdbm_hash(const char *str) {
  * Malloc wrapper for counting graph memory usage
  */
 void *graph__malloc(size_t len) {
-    void *mem = mosquitto__malloc(len);
+    void *mem = malloc(len);
     if (mem != NULL) {
         memcount += malloc_usable_size(mem);
         if (memcount > max_memcount){
@@ -71,7 +71,7 @@ void *graph__malloc(size_t len) {
  * Calloc wrapper for counting graph memory usage
  */
 void *graph__calloc(size_t nmemb, size_t size) {
-	void *mem = mosquitto__calloc(nmemb, size);
+	void *mem = calloc(nmemb, size);
     if (mem != NULL) {
         memcount += malloc_usable_size(mem);
         if (memcount > max_memcount){
@@ -89,14 +89,14 @@ void graph__free(void *mem) {
 		return;
 	}
 	memcount -= malloc_usable_size(mem);
-	mosquitto__free(mem);
+	free(mem);
 }
 
 /*
  * Strdup wrapper for counting graph memory usage
  */
 char *graph__strdup(const char *s) {
-	char *str = mosquitto__strdup(s);
+	char *str = strdup(s);
 	if (str != NULL) {
 		memcount += malloc_usable_size(str);
         if (memcount > max_memcount){
