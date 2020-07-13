@@ -102,7 +102,7 @@ int handle__unsubscribe(struct mosquitto_db *db, struct mosquitto *context)
 		rc = sub__remove(db, context, sub, db->subs, &reason);
 		log__printf(NULL, MOSQ_LOG_UNSUBSCRIBE, "%s %s", context->id, sub);
 #ifdef WITH_GRAPH
-		network_graph_delete_subtopic(context, sub);
+		network_graph_delete_sub_edge(context, sub);
 #endif
 		mosquitto__free(sub);
 		if(rc){

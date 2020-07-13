@@ -300,6 +300,7 @@ int handle__publish(struct mosquitto_db *db, struct mosquitto *context)
 #ifdef WITH_GRAPH
 	network_graph_add_topic(context, retain, topic, payloadlen);
 #endif
+
 	if(qos > 0){
 		db__message_store_find(context, mid, &stored);
 	}

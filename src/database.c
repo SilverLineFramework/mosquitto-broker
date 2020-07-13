@@ -1053,6 +1053,9 @@ int db__message_write(struct mosquitto_db *db, struct mosquitto *context)
 				rc = send__publish(context, mid, topic, payloadlen, payload, qos, retain, retries, cmsg_props, store_props, expiry_interval);
 				if(rc == MOSQ_ERR_SUCCESS || rc == MOSQ_ERR_OVERSIZE_PACKET){
 					db__message_remove(db, &context->msgs_out, tail);
+#ifdef WITH_GRAPH
+					network_graph_add_sub_edge(context, topic);
+#endif
 				}else{
 					return rc;
 				}
@@ -1064,6 +1067,9 @@ int db__message_write(struct mosquitto_db *db, struct mosquitto *context)
 					tail->timestamp = mosquitto_time();
 					tail->dup = 1; /* Any retry attempts are a duplicate. */
 					tail->state = mosq_ms_wait_for_puback;
+#ifdef WITH_GRAPH
+					network_graph_add_sub_edge(context, topic);
+#endif
 				}else if(rc == MOSQ_ERR_OVERSIZE_PACKET){
 					db__message_remove(db, &context->msgs_out, tail);
 				}else{
@@ -1077,6 +1083,9 @@ int db__message_write(struct mosquitto_db *db, struct mosquitto *context)
 					tail->timestamp = mosquitto_time();
 					tail->dup = 1; /* Any retry attempts are a duplicate. */
 					tail->state = mosq_ms_wait_for_pubrec;
+#ifdef WITH_GRAPH
+					network_graph_add_sub_edge(context, topic);
+#endif
 				}else if(rc == MOSQ_ERR_OVERSIZE_PACKET){
 					db__message_remove(db, &context->msgs_out, tail);
 				}else{

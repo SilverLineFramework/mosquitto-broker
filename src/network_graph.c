@@ -17,6 +17,7 @@
 #include "sys_tree.h"
 #include "network_graph.h"
 
+#define GRAPH_QOS   2
 #define BUFLEN      100
 
 // Useful constants //
@@ -905,7 +906,7 @@ int network_graph_add_sub_edge(struct mosquitto *context, const char *topic) {
 /*
  * Called after client unsubscribes to topic
  */
-int network_graph_delete_subtopic(struct mosquitto *context, const char *topic) {
+int network_graph_delete_sub_edge(struct mosquitto *context, const char *topic) {
     bool match;
     struct ip_container *ip_cont;
     struct client *client;
@@ -1144,7 +1145,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
         // send out the updated graph to $GRAPH topic
         json_buf = cJSON_PrintUnformatted(root);
         if (json_buf != NULL && graph->changed) {
-            db__messages_easy_queue(db, NULL, "$GRAPH", 2, strlen(json_buf), json_buf, 1, 0, NULL);
+            db__messages_easy_queue(db, NULL, "$GRAPH", GRAPH_QOS, strlen(json_buf), json_buf, 1, 0, NULL);
             // log__printf(NULL, MOSQ_LOG_DEBUG, "%s", json_buf);
             graph->changed = false;
         }
@@ -1154,14 +1155,13 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
         if (current_heap != memcount) {
             current_heap = memcount;
             snprintf(heap_buf, BUFLEN, "%lu", current_heap);
-            log__printf(NULL, MOSQ_LOG_NOTICE, "%lu", current_heap);
-            db__messages_easy_queue(db, NULL, "$GRAPH/heap/current", 2, strlen(heap_buf), heap_buf, 1, 0, NULL);
+            db__messages_easy_queue(db, NULL, "$GRAPH/heap/current", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
         }
 
         if (max_heap != memcount) {
             max_heap = max_memcount;
             snprintf(heap_buf, BUFLEN, "%lu", max_heap);
-            db__messages_easy_queue(db, NULL, "$GRAPH/heap/maximum", 2, strlen(heap_buf), heap_buf, 1, 0, NULL);
+            db__messages_easy_queue(db, NULL, "$GRAPH/heap/maximum", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
         }
 
         last_update = mosquitto_time();

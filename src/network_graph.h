@@ -83,7 +83,7 @@ int network_graph_add_client(struct mosquitto *context);
 int network_graph_add_sub_edge(struct mosquitto *context, const char *topic);
 int network_graph_add_topic(struct mosquitto *context, uint8_t retain, const char *topic, uint32_t payloadlen);
 int network_graph_delete_client(struct mosquitto *context);
-int network_graph_delete_subtopic(struct mosquitto *context, const char *topic);
+int network_graph_delete_sub_edge(struct mosquitto *context, const char *topic);
 int network_graph_latency_start(struct mosquitto *context, const char *topic);
 int network_graph_latency_end(struct mosquitto *context);
 void network_graph_update(struct mosquitto_db *db, int interval);
