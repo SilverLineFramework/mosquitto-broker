@@ -28,11 +28,11 @@ struct pub_edge {
 struct topic {
     uint8_t retain;
     int ttl_cnt;                    // "ttl counter", if == 0, delete
+    char *full_name;                // full topic name
     cJSON *json;
     struct topic *next;
     struct topic *prev;
     struct sub_edge *sub_list;      // list of all subscriptions
-    char *full_name;                // full topic name
     uint16_t ref_cnt;               // # of clients pubbed to topic
     uint16_t bytes;
     unsigned long hash;             // hash(full_name)

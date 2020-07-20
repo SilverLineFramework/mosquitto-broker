@@ -15,19 +15,19 @@ client2.loop_start()
 
 time.sleep(1)
 
-print "pub"
+print("pub")
 client1.publish("simple/test/py", "test")
 time.sleep(1)
 
-print "sub"
+print("sub")
 client1.subscribe("simple/#", 1)
 time.sleep(1)
 
-print "pub"
+print("pub")
 client2.publish("simple/test/py1", "test1")
 time.sleep(1)
 
-print "sub"
+print("sub")
 client2.subscribe("simple/test/#", 1)
 time.sleep(1)
 

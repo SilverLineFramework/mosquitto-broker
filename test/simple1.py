@@ -15,51 +15,51 @@ time.sleep(1)
 client2.connect(brokers[1], 1883)
 client2.loop_start()
 
-print "pub"
+print("pub")
 client1.publish("test/publish/py", "string of characters")
 time.sleep(1)
 
-print "pub"
+print("pub")
 client2.publish("hi/test1", "hi")
 time.sleep(1)
 
-print "sub"
+print("sub")
 client1.subscribe("hi/test1", 1)
 time.sleep(1)
 
-print "sub"
+print("sub")
 client2.subscribe("test/publish/py")
 time.sleep(1)
 
-print "sub"
+print("sub")
 client1.subscribe("test/+/py")
 time.sleep(1)
 
-print "unsub"
+print("unsub")
 client1.unsubscribe("test/publish/py")
 time.sleep(1)
 
-print "pub"
+print("pub")
 client1.publish("test1/publish/js", "on", retain=False)
 time.sleep(1)
 
-print "sub"
+print("sub")
 client1.subscribe("test1/+/js")
 time.sleep(1)
 
-print "sub"
+print("sub")
 client2.subscribe("+/publish/js", 2)
 time.sleep(1)
 
-print "pub"
+print("pub")
 client1.publish("test1/publish/js", "on", retain=False)
 time.sleep(1)
 
-print "sub"
+print("sub")
 client2.subscribe("test1/#", 1)
 time.sleep(1)
 
-print "unsub"
+print("unsub")
 client1.unsubscribe("+/+/py")
 time.sleep(1)
 

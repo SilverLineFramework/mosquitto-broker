@@ -19,7 +19,7 @@ while False == False:
 
     if len(clients) < 3 or num <= 10: # connect
         new_client = mqtt.Client("client_py_"+rand_str(5), clean_session=True, transport="websockets")
-        print "added new client"
+        print("added new client")
         new_client.connect(random.choice(brokers), port)
         new_client.loop_start()
         clients += [new_client]
@@ -27,7 +27,7 @@ while False == False:
 
     if len(clients) > 3 and num <= 20: # disconnect
         client = random.choice(clients)
-        print "disconnected client"
+        print("disconnected client")
         client.disconnect()
         client.loop_stop()
         clients.remove(client)
@@ -40,7 +40,7 @@ while False == False:
             topic += rand_str(random.randint(2,7)) + "/"
         topic += rand_str(2)
         pub_topics += [topic]
-        print "pubbed to", topic
+        print("pubbed to", topic)
         client.publish(topic, rand_str(random.randint(10,100)), retain=False)
         time.sleep(1)
 
@@ -49,7 +49,7 @@ while False == False:
             client = random.choice(clients)
             qos = random.randint(0,2)
             topic = random.choice(pub_topics)
-            print "subbed to", topic
+            print("subbed to", topic)
             client.subscribe(topic, qos)
             sub_topics += [topic]
             time.sleep(1)
@@ -59,7 +59,7 @@ while False == False:
             if len(sub_topics) > 0:
                 client = random.choice(clients)
                 topic = random.choice(sub_topics)
-                print "unsubbed to", topic
+                print("unsubbed to", topic)
                 client.unsubscribe(topic)
                 sub_topics.remove(topic)
                 time.sleep(1)

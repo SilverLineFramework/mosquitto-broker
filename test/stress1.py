@@ -40,19 +40,19 @@ while False == False:
             topic += rand_str(random.randint(2,7)) + "/"
         topic += rand_str(2)
         pub_topics += [topic]
-        print "pubbed to", topic
+        print("pubbed to", topic)
         client.publish(topic, rand_str(random.randint(10,50)), retain=False)
 
     elif num <= 70 and len(sub_topics) > 0:
         topic = random.choice(sub_topics)
-        print "unsubbed to", topic
+        print("unsubbed to", topic)
         client.unsubscribe(topic)
         sub_topics.remove(topic)
 
     elif num <= 100:
         qos = random.randint(0,2)
         topic = random.choice(pub_topics)
-        print "subbed to", topic
+        print("subbed to", topic)
         client.subscribe(topic, qos)
         sub_topics += [topic]
 

@@ -22,6 +22,6 @@ while False == False:
     for t in topics:
         client.publish(t, rand_str(random.randint(100,1000)), retain=False, qos=2)
         client.subscribe(t, 2)
-        print "added", t
+        print("added", t)
 
     time.sleep(1)

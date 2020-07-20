@@ -2,7 +2,7 @@
 
 if [ "$(uname)" == "Darwin" ]
 then
-    OPENSSL_DIR=$(find /usr/local/Cellar/openssl -name '1.*')
+    OPENSSL_DIR="/usr/local/opt/openssl"
 fi
 
 if [ -d "./build" ]

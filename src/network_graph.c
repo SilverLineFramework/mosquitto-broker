@@ -31,7 +31,9 @@ const char *topic_class = "topic";
 
 static struct network_graph *graph = NULL;
 static cJSON_Hooks *hooks = NULL;
+
 static int ttl_cnt = 0;
+
 static unsigned long memcount = 0;
 static unsigned long max_memcount = 0;
 
@@ -225,11 +227,11 @@ static struct topic *create_topic(const char *name, uint8_t retain) {
     if (!topic) return NULL;
     topic->retain = retain;
     topic->ttl_cnt = ttl_cnt;
+    topic->full_name = graph__strdup(name);
     topic->json = create_topic_json(name);
     topic->next = NULL;
     topic->prev = NULL;
     topic->sub_list = NULL;
-    topic->full_name = graph__strdup(name);
     topic->hash = sdbm_hash(name);
     topic->ref_cnt = 0;
     topic->bytes = 0;
@@ -472,7 +474,7 @@ static int graph_add_topic(struct topic *topic) {
 }
 
 /*
- * Deletes all the subcription edges of a topic
+ * Delete all the subcription edges of a topic
  */
 static int graph_delete_topic_sub_edges(struct topic *topic) {
     struct sub_edge *curr = topic->sub_list, *temp;
@@ -503,7 +505,7 @@ static inline void graph_detach_topic(struct topic *topic) {
 }
 
 /*
- * Deletes a topic
+ * Delete a topic
  */
 static int graph_delete_topic(struct topic *topic) {
     graph_detach_topic(topic);
@@ -532,7 +534,7 @@ static int graph_add_sub_edge(struct topic *topic, struct sub_edge *sub_edge) {
 }
 
 /*
- * Deletes a sub edge from the sub list
+ * Delete a sub edge from the sub list
  */
 static int graph_delete_sub(struct topic *topic, struct sub_edge *sub_edge) {
     if (topic->sub_list == sub_edge) {
@@ -550,7 +552,7 @@ static int graph_delete_sub(struct topic *topic, struct sub_edge *sub_edge) {
 }
 
 /*
- * Deletes a sub edge from the sub list
+ * Delete a sub edge from the sub list
  */
 static int graph_delete_sub_edge(struct topic *topic, struct client *client) {
     struct sub_edge *sub_edge = find_sub_edge(topic, client);
@@ -576,6 +578,7 @@ static int graph_add_pub_edge(struct client *client, struct pub_edge *pub_edge) 
  */
 static int pub_edge_decr_ref_cnt(struct pub_edge *pub_edge) {
     if (--pub_edge->pub->ref_cnt == 0) {
+        // retained messages get deleted after an interval
         if (pub_edge->pub->retain) {
             pub_edge->pub->ttl_cnt = ttl_cnt;
         }
@@ -587,7 +590,7 @@ static int pub_edge_decr_ref_cnt(struct pub_edge *pub_edge) {
 }
 
 /*
- * Deletes all the publish edges of a client
+ * Delete all the publish edges of a client
  */
 static int graph_delete_client_pub_edges(struct client *client) {
     struct pub_edge *curr = client->pub_list, *temp;
@@ -603,7 +606,7 @@ static int graph_delete_client_pub_edges(struct client *client) {
 }
 
 /*
- * Deletes a pub edge from the pub list
+ * Delete a pub edge from the pub list
  */
 static int graph_delete_pub(struct client *client, struct pub_edge *pub_edge) {
     if (client->pub_list == pub_edge) {
@@ -622,7 +625,7 @@ static int graph_delete_pub(struct client *client, struct pub_edge *pub_edge) {
 }
 
 /*
- * Deletes a pub edge from the pub list
+ * Delete a pub edge from the pub list
  */
 static int graph_delete_pub_edge(struct client *client, struct topic *topic) {
     struct pub_edge *pub_edge = find_pub_edge(client, topic);
@@ -632,7 +635,7 @@ static int graph_delete_pub_edge(struct client *client, struct topic *topic) {
 }
 
 /*
- * Deletes an IP container
+ * Delete an IP container
  */
 static int graph_delete_ip(struct ip_container *ip_cont) {
     size_t idx = ip_cont->hash % graph->ip_dict->max_size;
@@ -648,9 +651,6 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
     cJSON_Delete(ip_cont->json);
     graph__free(ip_cont);
 
-    // if (graph->ip_dict->used < graph->ip_dict->max_size / 4) {
-    //     graph_set_ip_dict_size(graph->ip_dict->max_size / 2);
-    // }
     --graph->ip_dict->used;
     return 0;
 }
@@ -1136,28 +1136,23 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
             }
         }
 
-        // have to resize here instead of in delete_topic
-        // if (graph->topic_dict->used < graph->topic_dict->max_size / 4) {
-        //     graph_set_topic_dict_size(graph->topic_dict->max_size / 2);
-        // }
-        // --graph->topic_dict->used;
-
-        // send out the updated graph to $GRAPH topic
+        // publish the updated graph to $GRAPH topic
         json_buf = cJSON_PrintUnformatted(root);
         if (json_buf != NULL && graph->changed) {
             db__messages_easy_queue(db, NULL, "$GRAPH", GRAPH_QOS, strlen(json_buf), json_buf, 1, 0, NULL);
-            // log__printf(NULL, MOSQ_LOG_DEBUG, "%s", json_buf);
             graph->changed = false;
         }
         cJSON_free(json_buf);
         cJSON_Delete(root);
 
+        // update current graph memory usage topic
         if (current_heap != memcount) {
             current_heap = memcount;
             snprintf(heap_buf, BUFLEN, "%lu", current_heap);
             db__messages_easy_queue(db, NULL, "$GRAPH/heap/current", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
         }
 
+        // update current graph maximum memory usage topic
         if (max_heap != memcount) {
             max_heap = max_memcount;
             snprintf(heap_buf, BUFLEN, "%lu", max_heap);
