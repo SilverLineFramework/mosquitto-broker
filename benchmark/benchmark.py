@@ -20,9 +20,9 @@ tot, cnt = 0, 0
 avgs = []
 times = []
 
-def add_cam(cams):
+def add_cam(cams, broker, port):
     cam = Camera(f"cam{len(cams)}", "bench", "#52e8be")
-    cam.connect("oz.andrew.cmu.edu", 9001)
+    cam.connect(broker, port)
     cams += [cam]
 
 def move_cam(cams, killer):
@@ -42,7 +42,7 @@ def move_cam(cams, killer):
         if killer.kill_now:
             break
 
-def main(num_cams, num_threads):
+def main(num_cams, num_threads, broker, port):
     global lock
     global tot
     global cnt
@@ -54,7 +54,7 @@ def main(num_cams, num_threads):
     cams = []
     threads = []
     for _ in range(num_cams):
-        add_cam(cams)
+        add_cam(cams, broker, port)
 
     bins = np.array_split(np.array(cams), num_threads)
     for i in range(num_threads):
@@ -62,17 +62,19 @@ def main(num_cams, num_threads):
         threads += [thread]
         thread.start()
 
-    start_t = time.time()*1000000
+    start_t = time.time()*1000
     while True:
-        now = time.time()*1000000
-        if int(now - start_t) % 1000000 == 0:
+        now = time.time()*1000
+        if int(now - start_t) % 1000 == 0:
             with lock:
                 if cnt != 0:
                     avgs += [tot / cnt]
-                    times += [int(now - start_t) // 1000000]
+                    times += [int(now - start_t) / 1000]
+            time.sleep(0.01)
 
         if killer.kill_now:
-            break
+            if input("Terminate [y/n]? ") == "y":
+                break
 
     for thread in threads:
         thread.join()
@@ -80,13 +82,11 @@ def main(num_cams, num_threads):
     for c in cams:
         c.disconnect()
 
-    print()
-
     plt.plot(times, avgs)
     plt.title(f"Time vs Response Time - {num_cams} client(s), {num_threads} thread(s)")
     plt.xlabel("Time (s)")
     plt.ylabel("Response Time (ms)")
-    plt.savefig(f'plots/time_vs_lat_{num_cams}_{num_threads}.png')
+    plt.savefig(f'plots/time_vs_lat_{num_cams}_{num_threads}_2.png')
     # plt.show()
 
 if __name__ == "__main__":
@@ -96,6 +96,10 @@ if __name__ == "__main__":
                         default=1)
     parser.add_argument("-t", "--num_threads", type=int, help="Number of threads to spawn",
                         default=1)
+    parser.add_argument("-b", "--broker", type=str, help="Broker to connect to",
+                        default="oz.andrew.cmu.edu")
+    parser.add_argument("-p", "--port", type=int, help="Port to connect to",
+                        default=9001)
 
     args = parser.parse_args()
 

@@ -43,14 +43,14 @@ class Camera(object):
             self.lat = self.lat_total / self.lat_cnt
 
     def move(self):
-        self.pos[0] += rand_norm(0, 0.3)
-        self.pos[1] += rand_norm(0, 0.1)
-        self.pos[2] += rand_norm(0, 0.3)
+        self.pos[0] += rand_norm(0, 0.1)
+        self.pos[1] += rand_norm(0, 0.05)
+        self.pos[2] += rand_norm(0, 0.1)
 
-        self.rot[0] += rand_norm(0, 0.05)
-        self.rot[1] += rand_norm(0, 0.05)
-        self.rot[2] += rand_norm(0, 0.05)
-        self.rot[3] = 1
+        self.rot[0] += rand_norm(0, 0.01)
+        self.rot[1] += rand_norm(0, 0.01)
+        self.rot[2] += rand_norm(0, 0.01)
+        self.rot[3] += rand_norm(0, 0.01)
 
         arena_json = self.create_json()
         self.client.publish(f"realm/s/{self.scene}", arena_json)
