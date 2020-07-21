@@ -42,7 +42,7 @@ def move_cam(cams, killer):
         if killer.kill_now:
             break
 
-def main(num_cams, num_threads, broker, port):
+def main(num_cams, num_threads, broker, port, identifier):
     global lock
     global tot
     global cnt
@@ -86,7 +86,7 @@ def main(num_cams, num_threads, broker, port):
     plt.title(f"Time vs Response Time - {num_cams} client(s), {num_threads} thread(s)")
     plt.xlabel("Time (s)")
     plt.ylabel("Response Time (ms)")
-    plt.savefig(f'plots/time_vs_lat_{num_cams}_{num_threads}_2.png')
+    plt.savefig(f'plots/time_vs_lat_{identifier}.png')
     # plt.show()
 
 if __name__ == "__main__":
@@ -100,6 +100,8 @@ if __name__ == "__main__":
                         default="oz.andrew.cmu.edu")
     parser.add_argument("-p", "--port", type=int, help="Port to connect to",
                         default=9001)
+    parser.add_argument("-i", "--identifier", type=str, help="Optional id for saved plot",
+                        default="")
 
     args = parser.parse_args()
 
