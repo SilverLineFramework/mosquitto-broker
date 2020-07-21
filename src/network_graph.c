@@ -651,6 +651,9 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
     cJSON_Delete(ip_cont->json);
     graph__free(ip_cont);
 
+    if (graph->ip_dict->used < graph->ip_dict->max_size / 4) {
+        graph_set_ip_dict_size(graph->ip_dict->max_size / 2);
+    }
     --graph->ip_dict->used;
     return 0;
 }
@@ -1134,6 +1137,10 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                     topic = topic->next;
                 }
             }
+        }
+
+        if (graph->topic_dict->used < graph->topic_dict->max_size / 4) {
+            graph_set_topic_dict_size(graph->topic_dict->max_size / 2);
         }
 
         // publish the updated graph to $GRAPH topic
