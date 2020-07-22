@@ -1,10 +1,10 @@
 import numpy as np
 import argparse
-import time, signal, threading, logging
+import time, random, string, signal, sys
+import threading, logging
 from camera import Camera
 
-import matplotlib.pyplot as plt
-plt.style.use('seaborn-whitegrid')
+SCENE="bench_"+''.join(random.choice(string.ascii_lowercase+string.digits) for i in range(5))
 
 class GracefulKiller:
     def __init__(self):
@@ -16,35 +16,49 @@ class GracefulKiller:
         self.kill_now = True
 
 lock = threading.Lock()
-tot, cnt = 0, 0
+tot_lat, cnt = 0, 0
 avgs = []
 times = []
 
+def time_ms():
+    return time.time()*1000
+
+# root mean squared deviation
+def rmsd(arr):
+    avg = np.mean(arr)
+    diffs_sq = (np.array(arr) - avg)**2
+    rmsd = np.sum(diffs_sq) / len(diffs_sq)
+    return rmsd
+
 def add_cam(cams, broker, port):
-    cam = Camera(f"cam{len(cams)}", "bench", "#52e8be")
+    r = lambda: random.randint(0,255)
+    cam = Camera(f"cam{len(cams)}", SCENE, "#%02X%02X%02X" % (r(),r(),r()))
     cam.connect(broker, port)
     cams += [cam]
 
 def move_cam(cams, killer):
     global lock
-    global tot
+    global tot_lat
     global cnt
 
-    while 1:
-        for cam in cams:
-            cam.move()
-            with lock:
-                if cam.lat > 0:
-                    tot += cam.lat
-                    cnt += 1
-            time.sleep(0.5)
+    start_t = time_ms()
+    while True:
+        now = time_ms()
+        if int(now - start_t) % 100 == 0: # 10 Hz
+            for cam in cams:
+                cam.move()
+                with lock:
+                    if cam.lat > 0:
+                        tot_lat += cam.lat
+                        cnt += 1
+        time.sleep(0.001)
 
         if killer.kill_now:
             break
 
 def main(num_cams, num_threads, broker, port, identifier):
     global lock
-    global tot
+    global tot_lat
     global cnt
     global avgs
     global times
@@ -62,19 +76,34 @@ def main(num_cams, num_threads, broker, port, identifier):
         threads += [thread]
         thread.start()
 
-    start_t = time.time()*1000
+    print(f"Started! Scene is {SCENE}")
+
+    iters = 0
+    start_t = time_ms()
     while True:
-        now = time.time()*1000
-        if int(now - start_t) % 1000 == 0:
+        now = time_ms()
+        if int(now - start_t) % 100 == 0: # 10 Hz
             with lock:
                 if cnt != 0:
-                    avgs += [tot / cnt]
+                    avgs += [tot_lat / cnt]
                     times += [int(now - start_t) / 1000]
-            time.sleep(0.01)
+
+        if iters % (num_cams*1000) == 0:
+            sys.stdout.write(".")
+            sys.stdout.flush()
+
+        if len(avgs) > 50 and rmsd(avgs[-50:]) < 0.0001:
+            killer.kill_now = True
+            print("Converged!")
+            break
 
         if killer.kill_now:
             if input("Terminate [y/n]? ") == "y":
                 break
+            killer.kill_now = False
+
+        iters += 1
+        time.sleep(0.001)
 
     for thread in threads:
         thread.join()
@@ -82,12 +111,12 @@ def main(num_cams, num_threads, broker, port, identifier):
     for c in cams:
         c.disconnect()
 
-    plt.plot(times, avgs)
-    plt.title(f"Time vs Response Time - {num_cams} client(s), {num_threads} thread(s)")
-    plt.xlabel("Time (s)")
-    plt.ylabel("Response Time (ms)")
-    plt.savefig(f'plots/time_vs_lat_{identifier}.png')
-    # plt.show()
+    with open(f"data/time_vs_lat_{identifier}.txt", "w") as f:
+        f.write(f"{num_cams},{num_threads}\n")
+        f.writelines("%s," % t for t in times)
+        f.write("\n")
+        f.writelines("%s," % a for a in avgs)
+        f.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=("ARENA MQTT broker benchmarking"))

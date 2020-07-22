@@ -23,7 +23,7 @@ class Camera(object):
         self.lat_total = 0
         self.lat_cnt = 0
         self.lat = -1
-        self.client = mqtt.Client(name, clean_session=True, transport="websockets")
+        self.client = mqtt.Client(self.name, clean_session=True, transport="websockets")
         self.client.on_message = self.on_message
 
     def connect(self, broker, port):
