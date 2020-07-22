@@ -17,7 +17,7 @@ class Camera(object):
         super().__init__()
         self.name = f"camera_{rand_num(4)}_{name}"
         self.scene = scene
-        self.pos = [0,3.5,0]
+        self.pos = [0,3,0]
         self.rot = [0,0,0,0]
         self.color = color
         self.lat_total = 0
@@ -47,10 +47,10 @@ class Camera(object):
         self.pos[1] += rand_norm(0, 0.05)
         self.pos[2] += rand_norm(0, 0.1)
 
-        self.rot[0] += rand_norm(0, 0.01)
-        self.rot[1] += rand_norm(0, 0.01)
-        self.rot[2] += rand_norm(0, 0.01)
-        self.rot[3] += rand_norm(0, 0.01)
+        self.rot[0] += rand_norm(0, 0.05)
+        self.rot[1] += rand_norm(0, 0.05)
+        self.rot[2] += rand_norm(0, 0.05)
+        self.rot[3] += rand_norm(0, 0.05)
 
         arena_json = self.create_json()
         self.client.publish(f"realm/s/{self.scene}", arena_json)
