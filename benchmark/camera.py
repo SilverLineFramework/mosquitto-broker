@@ -53,7 +53,7 @@ class Camera(object):
         self.rot[3] += rand_norm(0, 0.01)
 
         arena_json = self.create_json()
-        self.client.publish(f"realm/s/{self.scene}", arena_json)
+        self.client.publish(f"realm/s/{self.scene}/{self.name}", arena_json)
 
     def create_json(self):
         res = {}

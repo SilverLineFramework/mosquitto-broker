@@ -14,8 +14,8 @@ def rand_color():
 # root mean squared deviation
 def rmsd(arr):
     avg = np.mean(arr)
-    diffs_sq = (np.array(arr) - avg)**2
-    rmsd = np.sum(diffs_sq) / len(diffs_sq)
+    diffs_sq = np.square(np.array(arr) - avg)
+    rmsd = np.mean(diffs_sq)
     return rmsd
 
 class GracefulKiller:
@@ -43,11 +43,7 @@ class Benchmark(object):
         self.timeout = timeout
 
     def start(self):
-        ps = []
-
-        for i in range(self.num_cams):
-            p1 = Process(target=self.move_cam, args=(i,))
-            ps += [p1]
+        ps = [Process(target=self.move_cam, args=()) for _ in range(self.num_cams)]
 
         for p in ps:
             p.start()
@@ -68,7 +64,7 @@ class Benchmark(object):
                     self.avg_lats += [self.tot_lat.value / self.cnt.value]
                     self.times += [int(now - start_t) / 1000]
 
-            if iters % (self.num_cams*1000) == 0:
+            if iters % 5000 == 0:
                 sys.stdout.write(".")
                 sys.stdout.flush()
 
@@ -77,10 +73,10 @@ class Benchmark(object):
                 print("Timeout reached, exiting...")
                 break
 
-            # if len(self.avg_lats) > 50 and rmsd(self.avg_lats[-50:]) < 0.0001:
-            #     self.killer.kill_now.value = 1
-            #     print("RMSD threshold crossed, exiting...")
-            #     break
+            if len(self.avg_lats) > 50 and rmsd(self.avg_lats[-50:]) < 0.00005:
+                self.killer.kill_now.value = 1
+                print("RMSD threshold crossed, exiting...")
+                break
 
             if self.killer.kill_now.value:
                 if input("Terminate [y/n]? ") == "y":
@@ -104,13 +100,13 @@ class Benchmark(object):
             f.writelines("%s," % a for a in self.avg_lats)
             f.close()
 
-    def add_cam(self, i):
-        cam = Camera(f"cam{i}", self.scene, rand_color())
+    def add_cam(self):
+        cam = Camera(f"cam", self.scene, rand_color())
         cam.connect(self.broker, self.port)
         return cam
 
-    def move_cam(self, i):
-        cam = self.add_cam(i)
+    def move_cam(self):
+        cam = self.add_cam()
 
         start_t = time_ms()
         while True:

@@ -15,6 +15,7 @@ def main(max_cams, timeout, broker, port, identifier):
 
         avg_lats += [test.get_avg_lat()]
         print(f"{num_cams} clients - {test.get_avg_lat()} ms")
+        time.sleep(1)
 
     print(avg_lats)
     with open(f"data/avg_lats_{identifier}_c{num_cams}.txt", "w") as f:

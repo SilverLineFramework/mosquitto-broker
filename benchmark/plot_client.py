@@ -11,7 +11,7 @@ def plot_lat_vs_client(name, num_cams, clients, avgs):
     plt.plot(clients, avgs, "--b.")
     plt.savefig(f"plots/{name}.png")
 
-def main(filename):
+def main(filename, bound):
     num_cams = 0
     clients = []
     avgs = []
@@ -20,7 +20,10 @@ def main(filename):
         contents = f.readlines()
 
         clients = [int(n) for n in contents[0].split(",")[:-1]]
+        bound = len(clients) if bound < 0 else bound
+        clients = clients[:bound]
         avgs = [float(n) for n in contents[1].split(",")[:-1]]
+        avgs = avgs[:bound]
 
     name = filename.split(".")[:-1][0].split("/")[-1]
 
@@ -31,6 +34,8 @@ if __name__ == "__main__":
 
     parser.add_argument("-f", "--filename", type=str, help="txt file to",
                         default="")
+    parser.add_argument("-b", "--bound", type=int, help="upper bound to plot to",
+                        default=-1)
 
     args = parser.parse_args()
 
