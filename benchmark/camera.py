@@ -1,5 +1,5 @@
 import time, json, random, string
-from math import ceil
+from math import ceil, sin, cos
 import paho.mqtt.client as mqtt
 
 def rand_str(N):
@@ -11,6 +11,14 @@ def rand_num(N):
 def rand_norm(mu, sig):
     res = random.gauss(mu, sig)
     return round(res, 3)
+
+def euler2quat(x, y, z):
+    quat = []
+    quat += [sin(x/2)*cos(y/2)*cos(z/2) - cos(x/2)*sin(y/2)*sin(z/2)]
+    quat += [cos(x/2)*sin(y/2)*cos(z/2) + sin(x/2)*cos(y/2)*sin(z/2)]
+    quat += [cos(x/2)*cos(y/2)*sin(z/2) - sin(x/2)*sin(y/2)*cos(z/2)]
+    quat += [cos(x/2)*cos(y/2)*cos(z/2) + sin(x/2)*sin(y/2)*sin(z/2)]
+    return quat
 
 class Camera(object):
     def __init__(self, name, scene, color):
@@ -47,10 +55,8 @@ class Camera(object):
         self.pos[1] += rand_norm(0, 0.05)
         self.pos[2] += rand_norm(0, 0.1)
 
-        self.rot[0] += rand_norm(0, 0.01)
-        self.rot[1] += rand_norm(0, 0.01)
-        self.rot[2] += rand_norm(0, 0.01)
-        self.rot[3] += rand_norm(0, 0.01)
+        quat = euler2quat(rand_norm(0, 6.28), rand_norm(0, 6.28), rand_norm(0, 6.28))
+        self.rot = quat
 
         arena_json = self.create_json()
         self.client.publish(f"realm/s/{self.scene}/{self.name}", arena_json)

@@ -2,7 +2,7 @@ import numpy as np
 import argparse
 import time, random, string, signal, sys
 from multiprocessing import Process, Value, Lock
-from camera import Camera
+from camera import *
 
 def time_ms():
     return time.time()*1000
@@ -101,7 +101,7 @@ class Benchmark(object):
             f.close()
 
     def add_cam(self):
-        cam = Camera(f"cam", self.scene, rand_color())
+        cam = Camera(f"cam{rand_num(5)}", self.scene, rand_color())
         cam.connect(self.broker, self.port)
         return cam
 
@@ -124,7 +124,7 @@ class Benchmark(object):
         cam.disconnect()
 
 def main(num_cams, timeout, broker, port, identifier):
-    s = lambda: "benchmark_"+''.join(random.choice(string.ascii_lowercase+string.digits) for i in range(5))
+    s = lambda: "benchmark_"+rand_str(5)
     test = Benchmark(identifier, num_cams, timeout*60000, broker, port, s())
     test.start()
     test.save()
