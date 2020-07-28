@@ -193,11 +193,28 @@ static cJSON *create_topic_json(const char *topic) {
  */
 static struct ip_container *create_ip_container(const char *ip) {
     struct ip_container *ip_cont = (struct ip_container *)graph__malloc(sizeof(struct ip_container));
-    if (!ip_cont) return NULL;
+    if (!ip_cont) {
+        return NULL;
+    }
     ip_cont->json = create_ip_json(ip);
     ip_cont->next = NULL;
     ip_cont->prev = NULL;
-    ip_cont->client_list = NULL;
+
+    ip_cont->client_dict = (struct client_dict *)graph__malloc(sizeof(struct client_dict));
+    if (!ip_cont->client_dict) {
+        graph__free(ip_cont);
+        return NULL;
+    }
+
+    ip_cont->client_dict->client_list = (struct client **)graph__calloc(1, sizeof(struct client *));
+    if (!ip_cont->client_dict->client_list) {
+        graph__free(ip_cont->client_dict);
+        graph__free(ip_cont);
+        return NULL;
+    }
+    ip_cont->client_dict->max_size = 1;
+    ip_cont->client_dict->used = 0;
+
     ip_cont->hash = sdbm_hash(ip);
     return ip_cont;
 }
@@ -322,7 +339,7 @@ static int graph_set_ip_dict_size(unsigned int new_size) {
 /*
  * Adds an IP container to the network graph
  */
-static int graph_add_ip_container(struct ip_container *ip_cont) {
+static int graph_add_ip(struct ip_container *ip_cont) {
     size_t idx;
     if (graph->ip_dict->used == graph->ip_dict->max_size) {
         graph_set_ip_dict_size(graph->ip_dict->max_size * 2);
@@ -342,25 +359,64 @@ static int graph_add_ip_container(struct ip_container *ip_cont) {
  * Searches for a client in an IP container given a client id
  */
 static struct client *find_client(struct ip_container *ip_cont, const char *id) {
-    unsigned long hash = sdbm_hash(id);
-    struct client *curr = ip_cont->client_list;
-    for (; curr != NULL; curr = curr->next) {
-        if (hash == curr->hash) {
-            return curr;
+    unsigned long hash = sdbm_hash(id),
+                   idx = hash % ip_cont->client_dict->max_size;
+    struct client *client = ip_cont->client_dict->client_list[idx];
+    for (; client != NULL; client = client->next) {
+        if (hash == client->hash) {
+            return client;
         }
     }
     return NULL;
 }
 
 /*
+ * Change the size of the client hash table
+ */
+static int graph_set_client_dict_size(struct ip_container *ip_cont, unsigned int new_size) {
+    size_t idx;
+    struct client **client_list_copy, *temp;
+    client_list_copy = ip_cont->client_dict->client_list;
+    ip_cont->client_dict->client_list = (struct client **)graph__calloc(new_size, sizeof(struct client *));
+    if (ip_cont->client_dict->client_list == NULL) return -1;
+
+    // rehash all elems of old dict and place them in new dict
+    for (size_t i = 0; i < ip_cont->client_dict->max_size; ++i) {
+        while (client_list_copy[i] != NULL) {
+            temp = client_list_copy[i];
+            client_list_copy[i] = client_list_copy[i]->next;
+            idx = temp->hash % new_size;
+            temp->prev = NULL;
+            temp->next = ip_cont->client_dict->client_list[idx];
+            if (ip_cont->client_dict->client_list[idx] != NULL) {
+                ip_cont->client_dict->client_list[idx]->prev = temp;
+            }
+            ip_cont->client_dict->client_list[idx] = temp;
+        }
+    }
+    ip_cont->client_dict->max_size = new_size;
+
+    graph__free(client_list_copy);
+
+    return 0;
+}
+
+/*
  * Adds a client to an IP container
  */
 static int graph_add_client(struct ip_container *ip_cont, struct client *client) {
-    client->next = ip_cont->client_list;
-    if (ip_cont->client_list != NULL) {
-        ip_cont->client_list->prev = client;
+    size_t idx;
+    if (ip_cont->client_dict->used == ip_cont->client_dict->max_size) {
+        graph_set_client_dict_size(ip_cont, ip_cont->client_dict->max_size * 2);
     }
-    ip_cont->client_list = client;
+
+    idx = client->hash % ip_cont->client_dict->max_size;
+    client->next = ip_cont->client_dict->client_list[idx];
+    if (ip_cont->client_dict->client_list[idx] != NULL) {
+        ip_cont->client_dict->client_list[idx]->prev = client;
+    }
+    ip_cont->client_dict->client_list[idx] = client;
+    ++ip_cont->client_dict->used;
     return 0;
 }
 
@@ -514,9 +570,6 @@ static int graph_delete_topic(struct topic *topic) {
     graph__free(topic->full_name);
     graph__free(topic);
 
-    // if (graph->topic_dict->used < graph->topic_dict->max_size / 4) {
-    //     graph_set_topic_dict_size(graph->topic_dict->max_size / 2);
-    // }
     --graph->topic_dict->used;
     return 0;
 }
@@ -649,6 +702,8 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
         ip_cont->prev->next = ip_cont->next;
     }
     cJSON_Delete(ip_cont->json);
+    graph__free(ip_cont->client_dict->client_list);
+    graph__free(ip_cont->client_dict);
     graph__free(ip_cont);
 
     if (graph->ip_dict->used < graph->ip_dict->max_size / 4) {
@@ -663,19 +718,15 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
  */
 static int graph_delete_client(struct ip_container *ip_cont, struct client *client) {
     struct topic *curr;
-    if (ip_cont->client_list == client) {
-        ip_cont->client_list = ip_cont->client_list->next;
+    size_t idx = client->hash % ip_cont->client_dict->max_size;
+    if (ip_cont->client_dict->client_list[idx] == client) {
+        ip_cont->client_dict->client_list[idx] = ip_cont->client_dict->client_list[idx]->next;
     }
     if (client->next != NULL) {
         client->next->prev = client->prev;
     }
     if (client->prev != NULL) {
         client->prev->next = client->next;
-    }
-
-    // if IP container is empty, delete it
-    if (ip_cont->client_list == NULL) {
-        graph_delete_ip(ip_cont);
     }
 
     // unlink client from all subbed topics
@@ -689,6 +740,16 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
     graph_delete_client_pub_edges(client);
     cJSON_Delete(client->json);
     graph__free(client);
+
+    if (ip_cont->client_dict->used < ip_cont->client_dict->max_size / 4) {
+        graph_set_client_dict_size(ip_cont, ip_cont->client_dict->max_size / 2);
+    }
+    --ip_cont->client_dict->used;
+
+    // if IP container is empty, delete it
+    if (ip_cont->client_dict->used == 0) {
+        graph_delete_ip(ip_cont);
+    }
     return 0;
 }
 
@@ -729,23 +790,26 @@ int network_graph_init(struct mosquitto_db *db) {
 
 int network_graph_cleanup(void) {
     struct ip_container *ip_curr, *ip_temp;
-    struct client *client, *client_temp;
+    struct client *client_curr, *client_temp;
     struct topic *topic_curr, *topic_temp;
 
     for (size_t i = 0; i < graph->ip_dict->max_size; ++i) {
         ip_curr = graph->ip_dict->ip_list[i];
         while (ip_curr != NULL) {
-            client = ip_curr->client_list;
-            while (client != NULL) {
-                client_temp = client;
-                client = client->next;
-                graph_delete_client_pub_edges(client_temp);
-                cJSON_Delete(client_temp->json);
-                graph__free(client_temp);
+            for (size_t j = 0; j < ip_curr->client_dict->max_size; ++j) {
+                client_curr = ip_curr->client_dict->client_list[j];
+                while (client_curr != NULL) {
+                    client_temp = client_curr;
+                    client_curr = client_curr->next;
+                    cJSON_Delete(client_curr->json);
+                    graph__free(client_curr);
+                }
             }
             ip_temp = ip_curr;
             ip_curr = ip_curr->next;
             cJSON_Delete(ip_temp->json);
+            graph__free(ip_temp->client_dict->client_list);
+            graph__free(ip_temp->client_dict);
             graph__free(ip_temp);
         }
     }
@@ -789,11 +853,11 @@ int network_graph_add_client(struct mosquitto *context) {
 
     if ((ip_cont = find_ip_container(address)) == NULL) {
         ip_cont = create_ip_container(address);
-        graph_add_ip_container(ip_cont);
+        graph_add_ip(ip_cont);
     }
 
     if (find_client(ip_cont, id) == NULL) {
-        graph_add_client(ip_cont, create_client(context->id, address));
+        graph_add_client(ip_cont, create_client(id, address));
     }
 
     graph->changed = true;
@@ -1079,28 +1143,31 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
             for (; ip_cont != NULL; ip_cont = ip_cont->next) {
                 cJSON_AddItemToArray(root, cJSON_Duplicate(ip_cont->json, true));
 
-                client = ip_cont->client_list; // each IP address holds a list of clients
-                for (; client != NULL; client = client->next) {
-                    cJSON_AddItemToArray(root, cJSON_Duplicate(client->json, true));
+                for (size_t j = 0; j < ip_cont->client_dict->max_size; ++j) {
+                    client = ip_cont->client_dict->client_list[j];
 
-                    pub_edge = client->pub_list;
-                    while (pub_edge != NULL) { // client may have published topics
-                        pub_edge_temp = pub_edge;
-                        pub_edge = pub_edge->next;
+                    for (; client != NULL; client = client->next) {
+                        cJSON_AddItemToArray(root, cJSON_Duplicate(client->json, true));
 
-                        temp_bytes = (double)pub_edge_temp->bytes / (now - last_update);
-                        pub_edge_temp->bytes = 0;
-                        pub_edge_temp->bytes_per_sec = round3(temp_bytes);
+                        pub_edge = client->pub_list;
+                        while (pub_edge != NULL) { // client may have published topics
+                            pub_edge_temp = pub_edge;
+                            pub_edge = pub_edge->next;
 
-                        if (pub_edge_temp->bytes_per_sec == 0.0 && --pub_edge_temp->ttl_cnt <= 0) {
-                            graph_delete_pub(client, pub_edge_temp);
-                            graph->changed = true;
-                        }
-                        else {
-                            // update outgoing bytes/s from client and add json
-                            data = cJSON_GetObjectItem(pub_edge_temp->json, "data");
-                            cJSON_SetNumberValue(cJSON_GetObjectItem(data, "bps"), pub_edge_temp->bytes_per_sec);
-                            cJSON_AddItemToArray(root, cJSON_Duplicate(pub_edge_temp->json, true));
+                            temp_bytes = (double)pub_edge_temp->bytes / (now - last_update);
+                            pub_edge_temp->bytes = 0;
+                            pub_edge_temp->bytes_per_sec = round3(temp_bytes);
+
+                            if (pub_edge_temp->bytes_per_sec == 0.0 && --pub_edge_temp->ttl_cnt <= 0) {
+                                graph_delete_pub(client, pub_edge_temp);
+                                graph->changed = true;
+                            }
+                            else {
+                                // update outgoing bytes/s from client and add json
+                                data = cJSON_GetObjectItem(pub_edge_temp->json, "data");
+                                cJSON_SetNumberValue(cJSON_GetObjectItem(data, "bps"), pub_edge_temp->bytes_per_sec);
+                                cJSON_AddItemToArray(root, cJSON_Duplicate(pub_edge_temp->json, true));
+                            }
                         }
                     }
                 }

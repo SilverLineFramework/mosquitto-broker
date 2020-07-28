@@ -51,11 +51,17 @@ struct client {
     unsigned long hash;             // hash(client_id)
 };
 
+struct client_dict {
+    size_t used;
+    size_t max_size;
+    struct client **client_list;    // list of all clients connect with ip
+};
+
 struct ip_container {
     cJSON *json;
     struct ip_container *next;
     struct ip_container *prev;
-    struct client *client_list;     // list of all clients with specific IP address
+    struct client_dict *client_dict;// dict of all clients with specific IP address
     unsigned long hash;             // hash(IP)
 };
 

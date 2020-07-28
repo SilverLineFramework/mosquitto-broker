@@ -5,10 +5,11 @@ import matplotlib.pyplot as plt
 plt.style.use('seaborn-whitegrid')
 
 def plot_lat_vs_client(name, num_cams, clients, avgs):
+    plt.figure(figsize=(35,15))
     plt.title(f"Latency vs Num Clients")
     plt.xlabel("Number of Clients")
     plt.ylabel("Avg Latency (ms)")
-    plt.plot(clients, avgs, "--b.")
+    plt.errorbar(clients, avgs, fmt="--bo", yerr=np.std(avgs), solid_capstyle='projecting', capsize=5)
     plt.savefig(f"plots/{name}.png")
 
 def main(filename, bound):

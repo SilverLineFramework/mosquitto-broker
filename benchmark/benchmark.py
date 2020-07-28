@@ -73,10 +73,10 @@ class Benchmark(object):
                 print("Timeout reached, exiting...")
                 break
 
-            if len(self.avg_lats) > 50 and rmsd(self.avg_lats[-50:]) < 0.00005:
-                self.killer.kill_now.value = 1
-                print("RMSD threshold crossed, exiting...")
-                break
+            # if len(self.avg_lats) > 50 and rmsd(self.avg_lats[-50:]) < 0.00005:
+            #     self.killer.kill_now.value = 1
+            #     print("RMSD threshold crossed, exiting...")
+            #     break
 
             if self.killer.kill_now.value:
                 if input("Terminate [y/n]? ") == "y":
@@ -100,13 +100,13 @@ class Benchmark(object):
             f.writelines("%s," % a for a in self.avg_lats)
             f.close()
 
-    def add_cam(self):
+    def create_cam(self):
         cam = Camera(f"cam{rand_num(5)}", self.scene, rand_color())
         cam.connect(self.broker, self.port)
         return cam
 
     def move_cam(self):
-        cam = self.add_cam()
+        cam = self.create_cam()
 
         start_t = time_ms()
         while True:
@@ -141,7 +141,7 @@ if __name__ == "__main__":
                         default=9001)
     parser.add_argument("-i", "--identifier", type=str, help="Optional id for saved plot",
                         default="")
-    parser.add_argument("-o", "--timeout", type=int, help="Amount of mins to wait before ending data collection",
+    parser.add_argument("-t", "--timeout", type=int, help="Amount of mins to wait before ending data collection",
                         default=5) # default is 5 mins
 
     args = parser.parse_args()

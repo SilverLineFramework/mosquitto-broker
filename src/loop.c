@@ -668,7 +668,9 @@ void do_disconnect(struct mosquitto_db *db, struct mosquitto *context, int reaso
 		if(db->config->connection_messages == true){
 			if(context->id){
 				id = context->id;
+#ifdef WITH_GRAPH
 				network_graph_delete_client(context);
+#endif
 			}else{
 				id = "<unknown>";
 			}

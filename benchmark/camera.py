@@ -40,8 +40,8 @@ class Camera(object):
         self.client.subscribe(f"realm/s/{self.scene}/#")
 
     def disconnect(self):
-        self.client.disconnect()
         self.client.loop_stop()
+        self.client.disconnect()
 
     def on_message(self, client, userdata, message):
         arena_json = json.loads(message.payload.decode())
