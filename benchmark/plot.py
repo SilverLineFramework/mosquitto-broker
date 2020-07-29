@@ -8,7 +8,7 @@ def plot_line(name, num_cams, data):
     times = data[0]
     avgs = data[1]
 
-    plt.title(f"Time vs Latency - {num_cams} client(s)")
+    plt.title(f"Time vs Latency for {num_cams} client(s)")
     plt.xlabel("Time (s)")
     plt.ylabel("Latency (ms)")
     plt.plot(times, avgs, "--b.")
@@ -17,7 +17,7 @@ def plot_line(name, num_cams, data):
 def plot_hist(name, num_cams, data):
     avgs = data[1]
 
-    plt.title(f"Hist - {num_cams} client(s)")
+    plt.title(f"Hist for {num_cams} client(s)")
     plt.xlabel("Latency (ms)")
     plt.ylabel("Freq")
     plt.hist(avgs, bins=100, density=True, orientation="horizontal")

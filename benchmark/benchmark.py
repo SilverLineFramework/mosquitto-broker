@@ -90,7 +90,7 @@ class Benchmark(object):
         return self.avg_lats[-100:]
 
     def save(self):
-        np.save(f"data/time_vs_lat_{self.name}_c{self.num_cams}", np.array([self.times, self.avg_lats]))
+        np.save(f"data/time_vs_lat_{self.name}", np.array([self.times, self.avg_lats]))
 
     def create_cam(self):
         cam = Camera(f"cam{rand_num(5)}", self.scene, rand_color())
