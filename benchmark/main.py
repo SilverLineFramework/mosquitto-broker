@@ -1,4 +1,5 @@
 import argparse
+import numpy as np
 import time, random, string, signal, sys
 from camera import Camera
 from benchmark import Benchmark
@@ -13,16 +14,13 @@ def main(max_cams, timeout, broker, port, identifier):
         test.start()
         test.save()
 
-        avg_lats += [test.get_avg_lat()]
-        print(f"{num_cams} clients - {test.get_avg_lat()} ms")
+        avg_lats += [test.get_avg_lats()]
+        print(f"{num_cams} clients - {np.mean(avg_lats[-1])} ms")
         time.sleep(1)
 
-    print(avg_lats)
-    with open(f"data/avg_lats_{identifier}_c{num_cams}.txt", "w") as f:
-        f.writelines("%s," % i for i in range(1,len(avg_lats)+1))
-        f.write("\n")
-        f.writelines("%s," % a for a in avg_lats)
-        f.close()
+    avg_lats = np.array(avg_lats)
+    # print(avg_lats)
+    np.save(f"data/avg_lats_{identifier}_c{num_cams}", avg_lats)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=("ARENA MQTT broker benchmarking"))

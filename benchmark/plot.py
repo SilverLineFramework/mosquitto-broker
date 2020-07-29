@@ -1,24 +1,32 @@
-import numpy as np
 import argparse
+import numpy as np
 
 import matplotlib.pyplot as plt
 plt.style.use('seaborn-whitegrid')
 
-def plot_line(name, num_cams, times, avgs):
+def plot_line(name, num_cams, data):
+    times = data[0]
+    avgs = data[1]
+
     plt.title(f"Time vs Latency - {num_cams} client(s)")
     plt.xlabel("Time (s)")
     plt.ylabel("Latency (ms)")
     plt.plot(times, avgs, "--b.")
     plt.savefig(f"plots/{name}_line.png")
 
-def plot_hist(name, num_cams, avgs):
+def plot_hist(name, num_cams, data):
+    avgs = data[1]
+
     plt.title(f"Hist - {num_cams} client(s)")
     plt.xlabel("Latency (ms)")
     plt.ylabel("Freq")
     plt.hist(avgs, bins=100, density=True, orientation="horizontal")
     plt.savefig(f"plots/{name}_hist.png")
 
-def plot_both(name, num_cams, times, avgs):
+def plot_both(name, num_cams, data):
+    times = data[0]
+    avgs = data[1]
+
     plt.subplots_adjust(wspace=0.35)
 
     plt.subplot(1, 2, 1)
@@ -40,23 +48,17 @@ def main(filename, plot_type):
     times = []
     avgs = []
 
-    with open(filename, "r") as f:
-        contents = f.readlines()
-
-        info = contents[0].split(",")
-        num_cams = int(info[0])
-
-        times = [float(n) for n in contents[1].split(",")[:-1]]
-        avgs = [float(n) for n in contents[2].split(",")[:-1]]
-
     name = filename.split(".")[:-1][0].split("/")[-1]
+    num_cams = int(name.split("_")[-1][1:])
+
+    data = np.load(filename)
 
     if plot_type == "line":
-        plot_line(name, num_cams, times, avgs)
+        plot_line(name, num_cams, data)
     elif plot_type == "hist":
-        plot_hist(name, num_cams, avgs)
+        plot_hist(name, num_cams, data)
     else:
-        plot_both(name, num_cams, times, avgs)
+        plot_both(name, num_cams, data)
     # plt.show()
 
 if __name__ == "__main__":

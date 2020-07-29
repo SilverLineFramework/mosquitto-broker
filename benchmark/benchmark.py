@@ -1,5 +1,5 @@
-import numpy as np
 import argparse
+import numpy as np
 import time, random, string, signal, sys
 from multiprocessing import Process, Value, Lock
 from camera import *
@@ -73,7 +73,7 @@ class Benchmark(object):
                 print("Timeout reached, exiting...")
                 break
 
-            # if len(self.avg_lats) > 50 and rmsd(self.avg_lats[-50:]) < 0.00005:
+            # if len(self.avg_lats) > 100 and rmsd(self.avg_lats[-100:]) < 0.00005:
             #     self.killer.kill_now.value = 1
             #     print("RMSD threshold crossed, exiting...")
             #     break
@@ -86,19 +86,11 @@ class Benchmark(object):
             iters += 1
             time.sleep(0.001)
 
-    def get_avg_lat(self):
-        if len(self.avg_lats) > 0:
-            return np.mean(self.avg_lats[-50:])
-        else:
-            return -1.0
+    def get_avg_lats(self):
+        return self.avg_lats[-100:]
 
     def save(self):
-        with open(f"data/time_vs_lat_{self.name}.txt", "w") as f:
-            f.write(f"{self.num_cams}\n")
-            f.writelines("%s," % t for t in self.times)
-            f.write("\n")
-            f.writelines("%s," % a for a in self.avg_lats)
-            f.close()
+        np.save(f"data/time_vs_lat_{self.name}_c{self.num_cams}", np.array([self.times, self.avg_lats]))
 
     def create_cam(self):
         cam = Camera(f"cam{rand_num(5)}", self.scene, rand_color())
@@ -128,7 +120,7 @@ def main(num_cams, timeout, broker, port, identifier):
     test = Benchmark(identifier, num_cams, timeout*60000, broker, port, s())
     test.start()
     test.save()
-    print(test.get_avg_lat(), "ms")
+    print(np.mean(test.get_avg_lats()), "ms")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=("ARENA MQTT broker benchmarking"))
