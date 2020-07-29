@@ -124,7 +124,7 @@ class Benchmark(object):
         cam.disconnect()
 
 def main(num_cams, timeout, broker, port, identifier):
-    s = lambda: "benchmark_"+rand_str(5)
+    s = lambda: "benchmark_"+rand_str(4)
     test = Benchmark(identifier, num_cams, timeout*60000, broker, port, s())
     test.start()
     test.save()

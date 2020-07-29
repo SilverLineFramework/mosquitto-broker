@@ -419,12 +419,12 @@ static int graph_add_client(struct ip_container *ip_cont, struct client *client)
     ++ip_cont->client_dict->used;
     return 0;
 }
-
 /*
  * Searches for a published topic
  */
-static struct topic *find_pub_topic(const char *topic) {
-    unsigned long hash = sdbm_hash(topic), idx = hash % graph->topic_dict->max_size;
+static struct topic *find_topic(const char *topic) {
+    unsigned long hash = sdbm_hash(topic),
+                        idx = hash % graph->topic_dict->max_size;
     struct topic *curr = graph->topic_dict->topic_list[idx];
     for (; curr != NULL; curr = curr->next) {
         if (hash == curr->hash) {
@@ -455,24 +455,6 @@ static struct pub_edge *find_pub_edge(struct client *client, struct topic *topic
     for (; curr != NULL; curr = curr->next) {
         if (curr->pub == topic) {
             return curr;
-        }
-    }
-    return NULL;
-}
-
-/*
- * Searches for a subscribed topic
- */
-static struct topic *find_sub_topic(const char *topic) {
-    bool match;
-    struct topic *curr;
-    for (size_t i = 0; i < graph->topic_dict->max_size; ++i) {
-        curr = graph->topic_dict->topic_list[i];
-        for (; curr != NULL; curr = curr->next) {
-            mosquitto_topic_matches_sub(topic, curr->full_name, &match);
-            if (match) {
-                return curr;
-            }
         }
     }
     return NULL;
@@ -896,7 +878,7 @@ int network_graph_add_topic(struct mosquitto *context, uint8_t retain, const cha
     }
 
     // topic doesnt exist
-    if ((topic_vert = find_pub_topic(topic)) == NULL) {
+    if ((topic_vert = find_topic(topic)) == NULL) {
         topic_vert = create_topic(topic, retain);
         graph_add_topic(topic_vert);
         ++topic_vert->ref_cnt;
@@ -953,18 +935,12 @@ int network_graph_add_sub_edge(struct mosquitto *context, const char *topic) {
         return -1;
     }
 
-    // check if sub_edge already exists, if not, create sub_edge
-    for (size_t i = 0; i < graph->topic_dict->max_size; ++i) {
-        topic_vert = graph->topic_dict->topic_list[i];
-        for (; topic_vert != NULL; topic_vert = topic_vert->next) {
-            mosquitto_topic_matches_sub(topic, topic_vert->full_name, &match);
-            if (match && find_sub_edge(topic_vert, client) == NULL) {
-                sub_edge = create_sub_edge(topic_vert->full_name, id);
-                sub_edge->sub = client;
-                graph_add_sub_edge(topic_vert, sub_edge);
-                graph->changed = true;
-            }
-        }
+    topic_vert = find_topic(topic);
+    if (topic_vert && find_sub_edge(topic_vert, client) == NULL) {
+        sub_edge = create_sub_edge(topic_vert->full_name, id);
+        sub_edge->sub = client;
+        graph_add_sub_edge(topic_vert, sub_edge);
+        graph->changed = true;
     }
 
     return 0;
