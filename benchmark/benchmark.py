@@ -73,7 +73,7 @@ class Benchmark(object):
                 print("Timeout reached, exiting...")
                 break
 
-            # if len(self.avg_lats) > 100 and rmsd(self.avg_lats[-100:]) < 0.00005:
+            # if len(self.avg_lats) > 50 and rmsd(self.avg_lats[-50:]) < 0.00005:
             #     self.killer.kill_now.value = 1
             #     print("RMSD threshold crossed, exiting...")
             #     break
@@ -87,7 +87,7 @@ class Benchmark(object):
             time.sleep(0.001)
 
     def get_avg_lats(self):
-        return self.avg_lats[-100:]
+        return self.avg_lats[-50:]
 
     def save(self):
         np.save(f"data/time_vs_lat_{self.name}", np.array([self.times, self.avg_lats]))

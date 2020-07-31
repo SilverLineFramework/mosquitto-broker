@@ -6,14 +6,18 @@ plt.style.use('seaborn-whitegrid')
 
 def plot_lat_vs_client(name, bound, data):
     clients = [int(n) for n in range(1, data.shape[0]+1)][:bound]
-    avgs = np.mean(data, axis=1)[:bound]
-    st_devs = np.std(data, axis=1)[:bound]
+    try:
+        avgs = np.mean(data, axis=1)[:bound]
+        st_devs = np.std(data, axis=1)[:bound]
+    except:
+        avgs = list(map(np.mean, data))[:bound]
+        st_devs = list(map(np.std, data))[:bound]
 
     plt.figure(figsize=(35,15))
     plt.title(f"Latency vs Num Clients")
     plt.xlabel("Number of Clients")
     plt.ylabel("Avg Latency (ms)")
-    plt.errorbar(clients, avgs, yerr=st_devs, fmt="--bo", solid_capstyle='projecting', capsize=5)
+    plt.errorbar(clients, avgs, yerr=st_devs, fmt="--b.", solid_capstyle='projecting', capsize=5)
     plt.savefig(f"plots/{name}.png")
 
 def main(filename, bound):
