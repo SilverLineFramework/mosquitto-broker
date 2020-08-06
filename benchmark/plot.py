@@ -2,7 +2,7 @@ import argparse
 import numpy as np
 
 import matplotlib.pyplot as plt
-plt.style.use('seaborn-whitegrid')
+plt.style.use("seaborn-whitegrid")
 
 def plot_line(name, num_cams, data):
     times = data[0]
@@ -24,8 +24,7 @@ def plot_hist(name, num_cams, data):
     plt.savefig(f"plots/{name}_hist.png")
 
 def plot_both(name, num_cams, data):
-    times = data[0]
-    avgs = data[1]
+    times, avgs = data
 
     plt.subplots_adjust(wspace=0.35)
 
@@ -50,7 +49,6 @@ def main(filename, plot_type):
 
     name = filename.split(".")[:-1][0].split("/")[-1]
     num_cams = int(name.split("_")[-1][1:])
-
     data = np.load(filename)
 
     if plot_type == "line":

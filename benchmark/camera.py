@@ -1,12 +1,8 @@
+import numpy as np
 import time, json, random, string
 from math import ceil, sin, cos
 import paho.mqtt.client as mqtt
-
-def rand_str(N):
-    return ''.join(random.choice(string.ascii_lowercase+string.digits) for i in range(N))
-
-def rand_num(N):
-    return ''.join(random.choice(string.digits) for i in range(N))
+from utils import *
 
 def rand_norm(mu, sig):
     res = random.gauss(mu, sig)
@@ -28,27 +24,39 @@ class Camera(object):
         self.pos = [0,3,0]
         self.rot = [0,0,0,0]
         self.color = color
-        self.lat_total = 0
-        self.lat_cnt = 0
-        self.lat = -1
+        self.lats = []
+        self.lat = None
+        self.bpmss = []
+        self.bpms = None
         self.client = mqtt.Client(self.name, clean_session=True, transport="websockets")
+        self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
 
     def connect(self, broker, port):
         self.client.connect(broker, port)
         self.client.loop_start()
-        self.client.subscribe(f"realm/s/{self.scene}/#")
 
     def disconnect(self):
         self.client.loop_stop()
         self.client.disconnect()
 
+    def on_connect(self, client, userdata, flags, rc):
+        client.subscribe(f"realm/s/{self.scene}/#")
+
     def on_message(self, client, userdata, message):
         arena_json = json.loads(message.payload.decode())
         if arena_json["object_id"] == self.name:
-            self.lat_total += (time.time() - arena_json["timestamp"]) * 1000 # ms
-            self.lat_cnt += 1
-            self.lat = self.lat_total / self.lat_cnt
+            dt = (time_ms() - arena_json["timestamp"]) # ms
+            self.lats += [dt] # ms
+            self.lat = np.mean(self.lats)
+            self.bpmss += [len(message.payload.decode()) / dt] # bytes/ms
+            self.bpms = np.mean(self.bpmss)
+
+    def get_avg_lat(self):
+        return self.lat
+
+    def get_avg_bpms(self):
+        return self.bpms
 
     def move(self):
         self.pos[0] += rand_norm(0, 0.1)
@@ -66,7 +74,7 @@ class Camera(object):
         res["object_id"] = self.name
         res["action"] = "create"
         res["type"] = "object"
-        res["timestamp"] = time.time()    # 2020-07-21T00:28:03.364Z
+        res["timestamp"] = time_ms()
 
         res["data"] = {}
         res["data"]["object_type"] = "camera"
