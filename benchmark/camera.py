@@ -26,8 +26,8 @@ class Camera(object):
         self.color = color
         self.lats = []
         self.lat = None
-        self.bpmss = []
-        self.bpms = None
+        self.bytes = 0
+        self.start_t = -1
         self.client = mqtt.Client(self.name, clean_session=True, transport="websockets")
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
@@ -42,6 +42,7 @@ class Camera(object):
 
     def on_connect(self, client, userdata, flags, rc):
         client.subscribe(f"realm/s/{self.scene}/#")
+        self.start_t = time_ms()
 
     def on_message(self, client, userdata, message):
         arena_json = json.loads(message.payload.decode())
@@ -49,14 +50,13 @@ class Camera(object):
             dt = (time_ms() - arena_json["timestamp"]) # ms
             self.lats += [dt] # ms
             self.lat = np.mean(self.lats)
-            self.bpmss += [len(message.payload.decode()) / dt] # bytes/ms
-            self.bpms = np.mean(self.bpmss)
+            self.bytes += len(message.payload.decode()) # bytes
 
     def get_avg_lat(self):
         return self.lat
 
-    def get_avg_bpms(self):
-        return self.bpms
+    def get_bytes_recvd(self):
+        return self.bytes
 
     def move(self):
         self.pos[0] += rand_norm(0, 0.1)

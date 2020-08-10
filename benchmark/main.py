@@ -13,17 +13,17 @@ def main(max_cams, timeout, broker, port, name, interval):
     cpu = []
     mem = []
     avg_lats = []
-    avg_bpms = []
+    bpms = []
     for num_cams in range(1, max_cams+interval, interval):
         test = Benchmark(f"{name}_c{num_cams}", num_cams, timeout*60000, broker, port, make_scene())
         test.run()
 
+        avg_lats += [test.get_avg_lats() if test.get_avg_lats() else [-1] * 100]
+        bpms += [test.get_bpms()]
         dropped += [test.get_dropped_cams()]
         cpu += [np.mean(test.get_cpu())]
         mem += [np.mean(test.get_mem())]
-        avg_lats += [test.get_avg_lats() if test.get_avg_lats() else [-1] * 100]
-        avg_bpms += [test.get_avg_bpms() if test.get_avg_bpms() else [-1] * 100]
-        print(f"{num_cams} clients -> {np.mean(avg_lats[-1])} ms | {np.mean(avg_bpms[-1])} bytes/ms | {dropped[-1]} dropped | {cpu[-1]}% cpu usage | {mem[-1]}% mem usage")
+        print(f"{num_cams} clients -> {np.mean(avg_lats[-1])} ms | {bpms[-1]} bytes/ms | {dropped[-1]} dropped | {cpu[-1]}% cpu usage | {mem[-1]}% mem usage")
 
         test.save()
 
@@ -33,8 +33,8 @@ def main(max_cams, timeout, broker, port, name, interval):
     cpu = np.array(cpu)
     mem = np.array(mem)
     avg_lats = np.array(avg_lats)
-    avg_bpms = np.array(avg_bpms)
-    np.savez(f"data/avg_lats_{name}_c{num_cams}_i{interval}", avg_lats=avg_lats, avg_bpms=avg_bpms, dropped=dropped, cpu=cpu, mem=mem)
+    bpms = np.array(bpms)
+    np.savez(f"data/avg_lats_{name}_c{num_cams}_i{interval}", avg_lats=avg_lats, bpms=bpms, dropped=dropped, cpu=cpu, mem=mem)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=("ARENA MQTT broker benchmarking"))

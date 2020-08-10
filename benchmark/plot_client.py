@@ -14,7 +14,7 @@ def plot_lat_vs_client(name, bound, data):
 
     dropped = data["dropped"][:bound]
     avg_lats = data["avg_lats"][:bound]
-    avg_bpms = data["avg_bpms"][:bound]
+    mbps = data["bpms"][:bound] * 0.001 # turn to Mb/s
     cpu = data["cpu"][:bound]
     mem = data["mem"][:bound]
 
@@ -23,13 +23,9 @@ def plot_lat_vs_client(name, bound, data):
     try:
         avgs = np.mean(avg_lats, axis=1)[:bound]
         st_devs = np.std(avg_lats, axis=1)[:bound]
-        bpms = np.mean(avg_bpms, axis=1)[:bound]
-        bpms_stds = np.std(avg_bpms, axis=1)[:bound]
     except:
         avgs = list(map(np.mean, avg_lats))[:bound]
         st_devs = list(map(np.std, avg_lats))[:bound]
-        bpms = list(map(np.mean, avg_bpms))[:bound]
-        bpms_stds = list(map(np.std, avg_bpms))[:bound]
 
     plt.figure(figsize=(20,10))
     plt.title("Latency vs Num Clients")
@@ -40,12 +36,12 @@ def plot_lat_vs_client(name, bound, data):
     plt.savefig(f"plots/{name}.png")
 
     plt.figure(figsize=(20,10))
-    plt.title("Bytes/ms vs Num Clients")
+    plt.title("Mb/s vs Num Clients")
     plt.xlabel("Number of Clients")
-    plt.ylabel("Bytes/Millisecond (bpms)")
-    plt.errorbar(clients, bpms, yerr=bpms_stds, fmt="--b.", solid_capstyle="projecting", capsize=5)
-    plt.bar(clients, dropped)
-    plt.savefig(f"plots/{name}_bpms.png")
+    plt.ylabel("Mb/s")
+    plt.plot(clients, mbps, "--b.")
+    # plt.bar(clients, dropped)
+    plt.savefig(f"plots/{name}_mbps.png")
 
     plt.figure(figsize=(20,10))
     plt.title("% CPU vs Num Clients")

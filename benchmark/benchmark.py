@@ -34,14 +34,14 @@ class Benchmark(object):
         self.port = port
         self.scene = scene
         self.dropped = 0
+        self.bytes = 0
         self.avg_lats = []
-        self.avg_bpms = []
         self.times = []
         self.cpu = []
         self.mem = []
         self.dropped_queue = Queue()
         self.lat_queue = Queue()
-        self.bpms_queue = Queue()
+        self.bytes_queue = Queue()
         self.killer = GracefulKiller()
         self.timeout = timeout
         self.client = mqtt.Client("cpu_mem_log_bench", clean_session=True)
@@ -69,14 +69,18 @@ class Benchmark(object):
                 time.sleep(1)
 
         print(f"Started! Scene is {self.scene}")
+        start_t = time_ms()
         self.collect()
+        self.elapsed = time_ms() - start_t
+        time.sleep(1)
 
         # clear out all queued results or else code will hang!
         while self.lat_queue.qsize() > 0:
             self.lat_queue.get()
 
-        while self.bpms_queue.qsize() > 0:
-            self.bpms_queue.get()
+        print(self.bytes_queue.qsize())
+        while self.bytes_queue.qsize() > 0:
+            self.bytes += self.bytes_queue.get()
 
         while self.dropped_queue.qsize() > 0:
             self.dropped += self.dropped_queue.get()
@@ -99,13 +103,8 @@ class Benchmark(object):
                 while self.lat_queue.qsize() > 0:
                     lat_tot += [self.lat_queue.get()]
 
-                bpms_tot = []
-                while self.bpms_queue.qsize() > 0:
-                    bpms_tot += [self.bpms_queue.get()]
-
-                if lat_tot and bpms_tot:
+                if lat_tot:
                     self.avg_lats += [np.mean(lat_tot)]
-                    self.avg_bpms += [np.mean(bpms_tot)]
                     self.times += [(now - start_t) / 1000]
 
             if iters % 5000 == 0:
@@ -150,9 +149,8 @@ class Benchmark(object):
             now = time_ms()
             if int(now - start_t) % 100 == 0: # 10 Hz
                 cam.move()
-                if cam.get_avg_lat() is not None and cam.get_avg_bpms() is not None:
+                if cam.get_avg_lat() is not None:
                     self.lat_queue.put(cam.get_avg_lat())
-                    self.bpms_queue.put(cam.get_avg_bpms())
 
             if int(now - start_t) > self.timeout:
                 break
@@ -160,12 +158,13 @@ class Benchmark(object):
             time.sleep(0.005)
 
         cam.disconnect()
+        self.bytes_queue.put(cam.get_bytes_recvd())
 
     def get_avg_lats(self):
         return self.avg_lats[-100:]
 
-    def get_avg_bpms(self):
-        return self.avg_bpms
+    def get_bpms(self):
+        return self.bytes / self.elapsed
 
     def get_dropped_cams(self):
         return self.dropped
@@ -184,7 +183,7 @@ def main(num_cams, timeout, broker, port, name):
     test = Benchmark(name, num_cams, timeout*60000, broker, port, "benchmark_"+rand_str(5))
     test.run()
     test.save()
-    print(f"{np.mean(test.get_avg_lats()) if test.get_avg_lats() else -1} ms | {np.mean(test.get_avg_bpms()) if test.get_avg_lats() else -1} bytes/ms | {test.get_dropped_cams()} dropped | {test.get_cpu()}% cpu usage | {test.get_mem()}% mem usage")
+    print(f"{np.mean(test.get_avg_lats()) if test.get_avg_lats() else -1} ms | {test.get_bpms() if test.get_avg_lats() else -1} bytes/ms | {test.get_dropped_cams()} dropped | {np.mean(test.get_cpu())}% cpu usage | {np.mean(test.get_mem())}% mem usage")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=("ARENA MQTT broker benchmarking"))
