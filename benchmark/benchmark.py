@@ -44,6 +44,7 @@ class Benchmark(object):
         self.bytes_queue = Queue()
         self.killer = GracefulKiller()
         self.timeout = timeout
+        self.start = Value("i", 0)
         self.client = mqtt.Client("cpu_mem_log_bench", clean_session=True)
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
@@ -65,10 +66,11 @@ class Benchmark(object):
 
         for i in range(len(ps)):
             ps[i].start()
-            if i != 0 and i % 50 == 0:
+            if i != 0 and i % 10 == 0:
                 time.sleep(1)
 
         print(f"Started! Scene is {self.scene}")
+        self.start.value = 1
         start_t = time_ms()
         self.collect()
         self.elapsed = time_ms() - start_t
@@ -78,9 +80,9 @@ class Benchmark(object):
         while self.lat_queue.qsize() > 0:
             self.lat_queue.get()
 
-        print(self.bytes_queue.qsize())
         while self.bytes_queue.qsize() > 0:
-            self.bytes += self.bytes_queue.get()
+            b = self.bytes_queue.get()
+            self.bytes += b
 
         while self.dropped_queue.qsize() > 0:
             self.dropped += self.dropped_queue.get()
@@ -147,13 +149,10 @@ class Benchmark(object):
                 break
 
             now = time_ms()
-            if int(now - start_t) % 100 == 0: # 10 Hz
+            if self.start.value and int(now - start_t) % 100 == 0: # 10 Hz
                 cam.move()
                 if cam.get_avg_lat() is not None:
                     self.lat_queue.put(cam.get_avg_lat())
-
-            if int(now - start_t) > self.timeout:
-                break
 
             time.sleep(0.005)
 

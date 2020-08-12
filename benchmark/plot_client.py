@@ -36,9 +36,9 @@ def plot_lat_vs_client(name, bound, data):
     plt.savefig(f"plots/{name}.png")
 
     plt.figure(figsize=(20,10))
-    plt.title("Mb/s vs Num Clients")
+    plt.title("MB/s vs Num Clients")
     plt.xlabel("Number of Clients")
-    plt.ylabel("Mb/s")
+    plt.ylabel("MB/s")
     plt.plot(clients, mbps, "--b.")
     # plt.bar(clients, dropped)
     plt.savefig(f"plots/{name}_mbps.png")
