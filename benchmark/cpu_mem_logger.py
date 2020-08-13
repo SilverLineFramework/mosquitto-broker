@@ -45,7 +45,7 @@ def main():
             time.sleep(0.005)
 
         if killer.kill_now:
-            if input("Terminate [y/n]? ") == "y":
+            if input("End Benchmark [y/n]? ") == "y":
                 break
             killer.kill_now = False
 

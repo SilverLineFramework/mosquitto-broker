@@ -1,74 +1,72 @@
-import numpy as np
 import argparse
+import numpy as np
 
 import matplotlib.pyplot as plt
 plt.style.use("seaborn-whitegrid")
 
-def plot_lat_vs_client(name, bound, data):
-    interval = int(name.split("_")[-1][1:])
+def plot_line(name, num_cams, data):
+    times = data["times"]
+    avgs = data["avg_lats"]
 
-    if bound is None:
-        bound = len(data["avg_lats"])
-    else:
-        bound //= interval
+    plt.title(f"Time vs Latency for {num_cams} client(s)")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Latency (ms)")
+    plt.plot(times, avgs, "--b.")
+    plt.savefig(f"plots/{name}_line.png")
 
-    dropped = data["dropped"][:bound]
-    avg_lats = data["avg_lats"][:bound]
-    mbps = data["bpms"][:bound] * 0.001 # turn to Mb/s
-    cpu = data["cpu"][:bound]
-    mem = data["mem"][:bound]
+def plot_hist(name, num_cams, data):
+    times = data["times"]
+    avgs = data["avg_lats"]
 
-    clients = [interval*int(n) for n in range(1, avg_lats.shape[0]+1)][:bound]
+    plt.title(f"Latency Hist for {num_cams} client(s)")
+    plt.xlabel("Latency (ms)")
+    plt.ylabel("Freq")
+    plt.hist(avgs, bins=100, density=True, orientation="horizontal")
+    plt.savefig(f"plots/{name}_hist.png")
 
-    try:
-        avgs = np.mean(avg_lats, axis=1)[:bound]
-        st_devs = np.std(avg_lats, axis=1)[:bound]
-    except:
-        avgs = list(map(np.mean, avg_lats))[:bound]
-        st_devs = list(map(np.std, avg_lats))[:bound]
+def plot_both(name, num_cams, data):
+    times = data["times"]
+    avgs = data["avg_lats"]
 
-    plt.figure(figsize=(20,10))
-    plt.title("Latency vs Num Clients")
-    plt.xlabel("Number of Clients")
-    plt.ylabel("Avg Latency (ms)")
-    plt.errorbar(clients, avgs, yerr=st_devs, fmt="--b.", solid_capstyle="projecting", capsize=5)
-    plt.bar(clients, dropped)
+    plt.subplots_adjust(wspace=0.35)
+
+    plt.subplot(1, 2, 1)
+    plt.title(f"Time vs Latency")
+    plt.xlabel("Time (s)")
+    plt.ylabel("Latency (ms)")
+    plt.plot(times, avgs, "--b.")
+
+    plt.subplot(1, 2, 2)
+    plt.title(f"Latency Histogram")
+    plt.xlabel("Freq")
+    plt.ylabel("Latency (ms)")
+    plt.hist(avgs, bins=100, density=True, orientation="horizontal")
+
     plt.savefig(f"plots/{name}.png")
 
-    plt.figure(figsize=(20,10))
-    plt.title("MB/s vs Num Clients")
-    plt.xlabel("Number of Clients")
-    plt.ylabel("MB/s")
-    plt.plot(clients, mbps, "--b.")
-    # plt.bar(clients, dropped)
-    plt.savefig(f"plots/{name}_mbps.png")
+def main(filename, plot_type):
+    num_cams = 0
+    times = []
+    avgs = []
 
-    plt.figure(figsize=(20,10))
-    plt.title("% CPU vs Num Clients")
-    plt.xlabel("Number of Clients")
-    plt.ylabel("% CPU used")
-    plt.plot(clients, cpu, "--b.")
-    plt.savefig(f"plots/{name}_cpu.png")
-
-    plt.figure(figsize=(20,10))
-    plt.title("% Memory vs Num Clients")
-    plt.xlabel("Number of Clients")
-    plt.ylabel("% Memory used")
-    plt.plot(clients, mem, "--b.")
-    plt.savefig(f"plots/{name}_mem.png")
-
-def main(filename, bound):
-    data = np.load(filename, allow_pickle=True)
     name = filename.split(".")[:-1][0].split("/")[-1]
-    plot_lat_vs_client(name, bound, data)
+    num_cams = int(name.split("_")[-1][1:])
+    data = np.load(filename)
+
+    if plot_type == "line":
+        plot_line(name, num_cams, data)
+    elif plot_type == "hist":
+        plot_hist(name, num_cams, data)
+    else:
+        plot_both(name, num_cams, data)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=("ARENA MQTT broker benchmarking"))
 
-    parser.add_argument("-f", "--filename", type=str, help="txt file to",
+    parser.add_argument("-f", "--filename", type=str, help=".npy file to plot",
                         default="")
-    parser.add_argument("-b", "--bound", type=int, help="upper bound to plot to",
-                        default=None)
+    parser.add_argument("-p", "--plot_type", type=str, help="line plot, histogram, or both",
+                        default="both")
 
     args = parser.parse_args()
 

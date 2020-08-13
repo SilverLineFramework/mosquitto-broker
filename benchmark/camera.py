@@ -26,7 +26,11 @@ class Camera(object):
         self.color = color
         self.lats = []
         self.lat = None
-        self.bytes = 0
+        self.bytes_sent = 0
+        self.bytes_recvd = 0
+        self.sent = 0
+        self.recvd = 0
+        self.id = 0
         self.client = mqtt.Client(self.name, clean_session=True, transport="websockets")
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
@@ -45,28 +49,39 @@ class Camera(object):
     def on_message(self, client, userdata, message):
         msg = message.payload.decode()
         arena_json = json.loads(msg)
+        self.bytes_recvd += len(msg)
         if arena_json["object_id"] == self.name:
             dt = (time_ms() - arena_json["timestamp"]) # ms
             self.lats += [dt] # ms
             self.lat = np.mean(self.lats)
+            self.recvd += 1
 
     def get_avg_lat(self):
         return self.lat
 
+    def get_bytes_sent(self):
+        return self.bytes_sent
+
     def get_bytes_recvd(self):
-        return self.bytes
+        return self.bytes_recvd
+
+    def get_packets_sent(self):
+        return self.sent
+
+    def get_packets_recvd(self):
+        return self.recvd
 
     def move(self):
         self.pos[0] += rand_norm(0, 0.1)
         self.pos[1] += rand_norm(0, 0.05)
         self.pos[2] += rand_norm(0, 0.1)
 
-        quat = euler2quat(rand_norm(0, 6.28), rand_norm(0, 6.28), rand_norm(0, 6.28))
-        self.rot = quat
+        self.rot = euler2quat(rand_norm(0, 6.28), rand_norm(0, 6.28), rand_norm(0, 6.28))
 
         arena_json = self.create_json()
+        self.bytes_sent += len(json.dumps(arena_json)) # bytes
+        self.sent += 1
         self.client.publish(f"realm/s/{self.scene}/{self.name}", arena_json)
-        self.bytes += len(json.dumps(arena_json)) # bytes
 
     def create_json(self):
         res = {}

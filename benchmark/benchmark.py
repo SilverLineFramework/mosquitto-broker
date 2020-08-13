@@ -33,15 +33,22 @@ class Benchmark(object):
         self.broker = broker
         self.port = port
         self.scene = scene
-        self.dropped = 0
-        self.bytes = 0
+        self.dropped_clients = 0
+        self.packets_sent = 0
+        self.packets_recvd = 0
+        self.bytes_sent = 0
+        self.bytes_recvd = 0
+        self.dropped_clients_queue = Queue()
+        self.packets_sent_queue = Queue()
+        self.packets_recvd_queue = Queue()
+        self.bytes_sent_queue = Queue()
+        self.bytes_recvd_queue = Queue()
         self.avg_lats = []
+        self.lat_temp = Value("d", 0.0)
+        self.lat_cnt = Value("i", 0)
         self.times = []
         self.cpu = []
         self.mem = []
-        self.dropped_queue = Queue()
-        self.lat_queue = Queue()
-        self.bytes_queue = Queue()
         self.killer = GracefulKiller()
         self.timeout = timeout
         self.start = Value("i", 0)
@@ -55,8 +62,8 @@ class Benchmark(object):
     def on_message(self, client, userdata, message):
         msg = json.loads(message.payload.decode())
         if "cpu" in msg and "mem" in msg:
-            self.cpu += [msg["cpu"]]
-            self.mem += [msg["mem"]]
+            self.cpu += [msg["cpu"]/100]
+            self.mem += [msg["mem"]/100]
 
     def run(self):
         self.client.connect("oz.andrew.cmu.edu", 1883)
@@ -76,16 +83,16 @@ class Benchmark(object):
         self.elapsed = time_ms() - start_t
         time.sleep(1)
 
-        # clear out all queued results or else code will hang!
-        while self.lat_queue.qsize() > 0:
-            self.lat_queue.get()
-
-        while self.bytes_queue.qsize() > 0:
-            b = self.bytes_queue.get()
-            self.bytes += b
-
-        while self.dropped_queue.qsize() > 0:
-            self.dropped += self.dropped_queue.get()
+        while self.dropped_clients_queue.qsize() > 0:
+            self.dropped_clients += self.dropped_clients_queue.get()
+        while self.packets_sent_queue.qsize() > 0:
+            self.packets_sent += self.packets_sent_queue.get()
+        while self.packets_recvd_queue.qsize() > 0:
+            self.packets_recvd += self.packets_recvd_queue.get()
+        while self.bytes_sent_queue.qsize() > 0:
+            self.bytes_sent += self.bytes_sent_queue.get()
+        while self.bytes_recvd_queue.qsize() > 0:
+            self.bytes_recvd += self.bytes_recvd_queue.get()
 
         for p in ps:
             p.join()
@@ -101,13 +108,9 @@ class Benchmark(object):
         while True:
             now = time_ms()
             if int(now - start_t) % 100 == 0: # 10 Hz
-                lat_tot = []
-                while self.lat_queue.qsize() > 0:
-                    lat_tot += [self.lat_queue.get()]
-
-                if lat_tot:
-                    self.avg_lats += [np.mean(lat_tot)]
-                    self.times += [(now - start_t) / 1000]
+                if self.lat_cnt.value > 0:
+                    self.avg_lats += [self.lat_temp.value / self.lat_cnt.value]
+                    self.times += [(now - start_t) / 1000] # secs
 
             if iters % 5000 == 0:
                 sys.stdout.write(".")
@@ -118,13 +121,13 @@ class Benchmark(object):
                 print("Timeout reached, exiting...")
                 break
 
-            if len(self.avg_lats) > 100 and rmsd(self.avg_lats[-100:]) < 0.00005:
-                self.killer.kill_now.value = 1
-                print("RMSD threshold crossed, exiting...")
-                break
+            # if len(self.avg_lats) > 100 and rmsd(self.avg_lats[-100:]) < 0.00005:
+            #     self.killer.kill_now.value = 1
+            #     print("RMSD threshold crossed, exiting...")
+            #     break
 
             if self.killer.kill_now.value:
-                if input("Terminate [y/n]? ") == "y":
+                if input("End Benchmark [y/n]? ") == "y":
                     break
                 self.killer.kill_now.value = 0
 
@@ -140,7 +143,7 @@ class Benchmark(object):
         try:
             cam = self.create_cam()
         except:
-            self.dropped_queue.put(1)
+            self.dropped_clients_queue.put(1)
             return
 
         start_t = time_ms()
@@ -152,21 +155,35 @@ class Benchmark(object):
             if self.start.value and int(now - start_t) % 100 == 0: # 10 Hz
                 cam.move()
                 if cam.get_avg_lat() is not None:
-                    self.lat_queue.put(cam.get_avg_lat())
+                    self.lat_temp.value += cam.get_avg_lat()
+                    self.lat_cnt.value += 1
 
             time.sleep(0.005)
 
         cam.disconnect()
-        self.bytes_queue.put(cam.get_bytes_recvd())
+
+        assert(self.start.value) # sanity check
+
+        self.bytes_sent_queue.put(cam.get_bytes_sent())
+        self.packets_sent_queue.put(cam.get_packets_sent())
+        self.bytes_recvd_queue.put(cam.get_bytes_recvd())
+        self.packets_recvd_queue.put(cam.get_packets_recvd())
 
     def get_avg_lats(self):
         return self.avg_lats[-100:]
 
-    def get_bpms(self):
-        return self.bytes / self.elapsed
+    def get_bpms_sent(self):
+        return self.bytes_sent / self.elapsed
 
-    def get_dropped_cams(self):
-        return self.dropped
+    def get_bpms_recvd(self):
+        return self.bytes_recvd / self.elapsed
+
+    def get_dropped_clients(self):
+        return self.dropped_clients
+
+    def dropped_packets_percent(self):
+        # print(self.packets_sent - self.packets_recvd, self.packets_recvd, self.packets_sent)
+        return (self.packets_sent - self.packets_recvd) / self.packets_sent
 
     def get_cpu(self):
         return self.cpu
@@ -175,18 +192,33 @@ class Benchmark(object):
         return self.mem
 
     def save(self):
-        np.save(f"data/time_vs_lat_{self.name}", np.array([self.times, self.avg_lats]))
+        np.savez(f"data/client_{self.name}_c{self.num_cams}", times=np.array(self.times), avg_lats=np.array(self.avg_lats))
 
 def main(num_cams, timeout, broker, port, name):
-    np.set_printoptions(precision=2)
+    print(f"----- Running benchmark with {num_cams} clients -----")
+
     test = Benchmark(name, num_cams, timeout*60000, broker, port, "benchmark_"+rand_str(5))
     test.run()
+
+    avg_lats = np.mean(test.get_avg_lats())
+    bpms_sent = test.get_bpms_sent()
+    bpms_recvd = test.get_bpms_recvd()
+    dropped_clients = test.get_dropped_clients()
+    dropped_packets_percent = test.dropped_packets_percent()
+    cpu = np.mean(test.get_cpu())
+    mem = np.mean(test.get_mem())
+
+    print("----- Summary -----")
+    print(f"{num_cams} clients:")
+    print(f"{np.mean(avg_lats)} ms | {bpms_sent} bytes/ms sent | {bpms_recvd} bytes/ms received")
+    print(f"{dropped_clients} clients dropped | {dropped_packets_percent*100}% packet loss | {cpu*100}% cpu usage | {mem*100}% mem usage")
+
     test.save()
-    print(f"{np.mean(test.get_avg_lats()) if test.get_avg_lats() else -1} ms | {test.get_bpms() if test.get_avg_lats() else -1} bytes/ms | {test.get_dropped_cams()} dropped | {np.mean(test.get_cpu())}% cpu usage | {np.mean(test.get_mem())}% mem usage")
+
+    print("------------------------------------------------------")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=("ARENA MQTT broker benchmarking"))
-
     parser.add_argument("-c", "--num_cams", type=int, help="Number of clients to spawn",
                         default=1)
     parser.add_argument("-b", "--broker", type=str, help="Broker to connect to",
@@ -195,9 +227,8 @@ if __name__ == "__main__":
                         default=9001)
     parser.add_argument("-n", "--name", type=str, help="Optional name for saved plot",
                         default="benchmark")
-    parser.add_argument("-t", "--timeout", type=int, help="Amount of mins to wait before ending data collection",
-                        default=3) # default is 3 mins
-
+    parser.add_argument("-t", "--timeout", type=float, help="Amount of mins to wait before ending data collection",
+                        default=3.0) # default is 3 mins
     args = parser.parse_args()
 
     main(**vars(args))
