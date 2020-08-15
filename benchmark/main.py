@@ -32,7 +32,7 @@ def main(max_cams, timeout, broker, port, name, interval):
         print("----- Summary -----")
         print(f"{num_cams} Clients connecting to {broker}:{port} with {timeout} sec timeout:")
         print(f"{np.mean(avg_lats[-1])} ms | {bpms_sent[-1]} bytes/ms sent | {bpms_recvd[-1]} bytes/ms received")
-        print(f"{dropped_clients[-1]} clients dropped | {dropped_packets_percent[-1]}% packet loss | {cpu[-1]}% cpu usage | {mem[-1]}% mem usage")
+        print(f"{dropped_clients[-1]} clients dropped | {dropped_packets_percent[-1]*100}% packet loss | {cpu[-1]*100}% cpu usage | {mem[-1]*100}% mem usage")
         print()
 
         test.save()

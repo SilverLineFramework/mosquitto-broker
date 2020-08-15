@@ -72,11 +72,15 @@ class Camera(object):
         return self.recvd
 
     def move(self):
-        self.pos[0] += rand_norm(0, 0.1)
-        self.pos[1] += rand_norm(0, 0.05)
-        self.pos[2] += rand_norm(0, 0.1)
+        self.pos[0] += rand_norm(0,0.1)
+        self.pos[1] += rand_norm(0,0.05)
+        self.pos[2] += rand_norm(0,0.1)
 
-        self.rot = euler2quat(rand_norm(0, 6.28), rand_norm(0, 6.28), rand_norm(0, 6.28))
+        self.rot = euler2quat(
+                        rand_norm(0,6.28),
+                        rand_norm(0,6.28),
+                        rand_norm(0,6.28)
+                    )
 
         arena_json = self.create_json()
         self.bytes_sent += len(json.dumps(arena_json)) # bytes

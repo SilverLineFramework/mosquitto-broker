@@ -1,7 +1,7 @@
 import argparse
 import numpy as np
 import time, random, string, signal, sys, json
-from multiprocessing import Process, Value, Queue
+from multiprocessing import Process, Value, Queue, Lock, Event
 import paho.mqtt.client as mqtt
 from camera import *
 from utils import *
@@ -33,25 +33,33 @@ class Benchmark(object):
         self.broker = broker
         self.port = port
         self.scene = scene
+        self.timeout = timeout
+
+        self.start_flag = Event()
+        self.killer = GracefulKiller()
+
+        self.times = []
+        self.avg_lats = []
+        self.lat_temp = Value("d", 0.0)
+        self.lat_cnt = Value("i", 0)
         self.dropped_clients = 0
         self.packets_sent = 0
         self.packets_recvd = 0
         self.bytes_sent = 0
         self.bytes_recvd = 0
+        self.cpu = []
+        self.mem = []
+
+        self.lat_lock = Lock()
+        self.queue_lock = Lock()
+        self.drop_lock = Lock()
+
         self.dropped_clients_queue = Queue()
         self.packets_sent_queue = Queue()
         self.packets_recvd_queue = Queue()
         self.bytes_sent_queue = Queue()
         self.bytes_recvd_queue = Queue()
-        self.avg_lats = []
-        self.lat_temp = Value("d", 0.0)
-        self.lat_cnt = Value("i", 0)
-        self.times = []
-        self.cpu = []
-        self.mem = []
-        self.killer = GracefulKiller()
-        self.timeout = timeout
-        self.start = Value("i", 0)
+
         self.client = mqtt.Client("cpu_mem_log_bench", clean_session=True)
         self.client.on_connect = self.on_connect
         self.client.on_message = self.on_message
@@ -71,17 +79,20 @@ class Benchmark(object):
 
         ps = [Process(target=self.move_cam, args=()) for _ in range(self.num_cams)]
 
-        for i in range(len(ps)):
+        for i in range(self.num_cams):
             ps[i].start()
             if i != 0 and i % 10 == 0:
                 time.sleep(1)
 
         print(f"Started! Scene is {self.scene}")
-        self.start.value = 1
+        self.start_flag.set()
         start_t = time_ms()
         self.collect()
         self.elapsed = time_ms() - start_t
         time.sleep(1)
+
+        self.client.loop_stop()
+        self.client.disconnect()
 
         while self.dropped_clients_queue.qsize() > 0:
             self.dropped_clients += self.dropped_clients_queue.get()
@@ -97,9 +108,6 @@ class Benchmark(object):
         for p in ps:
             p.join()
 
-        self.client.loop_stop()
-        self.client.disconnect()
-
         print("done!")
 
     def collect(self):
@@ -108,9 +116,11 @@ class Benchmark(object):
         while True:
             now = time_ms()
             if int(now - start_t) % 100 == 0: # 10 Hz
+                self.lat_lock.acquire()
                 if self.lat_cnt.value > 0:
                     self.avg_lats += [self.lat_temp.value / self.lat_cnt.value]
                     self.times += [(now - start_t) / 1000] # secs
+                self.lat_lock.release()
 
             if iters % 5000 == 0:
                 sys.stdout.write(".")
@@ -143,8 +153,12 @@ class Benchmark(object):
         try:
             cam = self.create_cam()
         except:
+            self.drop_lock.acquire()
             self.dropped_clients_queue.put(1)
+            self.drop_lock.release()
             return
+
+        self.start_flag.wait()
 
         start_t = time_ms()
         while True:
@@ -152,22 +166,24 @@ class Benchmark(object):
                 break
 
             now = time_ms()
-            if self.start.value and int(now - start_t) % 100 == 0: # 10 Hz
+            if int(now - start_t) % 100 == 0: # 10 Hz
                 cam.move()
                 if cam.get_avg_lat() is not None:
+                    self.lat_lock.acquire()
                     self.lat_temp.value += cam.get_avg_lat()
                     self.lat_cnt.value += 1
+                    self.lat_lock.release()
 
             time.sleep(0.005)
 
-        cam.disconnect()
-
-        assert(self.start.value) # sanity check
-
+        self.queue_lock.acquire()
         self.bytes_sent_queue.put(cam.get_bytes_sent())
-        self.packets_sent_queue.put(cam.get_packets_sent())
         self.bytes_recvd_queue.put(cam.get_bytes_recvd())
+        self.packets_sent_queue.put(cam.get_packets_sent())
         self.packets_recvd_queue.put(cam.get_packets_recvd())
+        self.queue_lock.release()
+
+        cam.disconnect()
 
     def get_avg_lats(self):
         return self.avg_lats[-100:]
@@ -182,7 +198,6 @@ class Benchmark(object):
         return self.dropped_clients
 
     def dropped_packets_percent(self):
-        # print(self.packets_sent - self.packets_recvd, self.packets_recvd, self.packets_sent)
         return (self.packets_sent - self.packets_recvd) / self.packets_sent
 
     def get_cpu(self):
@@ -192,7 +207,7 @@ class Benchmark(object):
         return self.mem
 
     def save(self):
-        np.savez(f"data/client_{self.name}_c{self.num_cams}", times=np.array(self.times), avg_lats=np.array(self.avg_lats))
+        np.savez(f"data/client_{self.name}", times=np.array(self.times), avg_lats=np.array(self.avg_lats))
 
 def main(num_cams, timeout, broker, port, name):
     print(f"----- Running benchmark with {num_cams} clients -----")
