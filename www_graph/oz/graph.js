@@ -77,10 +77,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const graphTopic = "$GRAPH";
 
     let prevJSON = [];
-    let paused = false;
+    let currIdx = 0;
 
     let spinner = document.querySelector(".refreshSpinner");
     let uptodate = document.getElementById("uptodate");
+
+    let pauseBtn = document.getElementById("pause");
+    let spinnerUpdate = true;
+    let paused = false;
 
     client.onConnectionLost = onConnectionLost;
     client.onMessageArrived = onMessageArrived;
@@ -103,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
         spinner.style.display = "none";
         uptodate.style.display = "block";
         uptodate.innerText = "Connecton lost. Refresh to try again.";
-        // client.connect({ onSuccess: onConnect });
+        client.connect({ onSuccess: onConnect });
     }
 
     function publish(client, dest, msg, qos) {
@@ -121,6 +125,7 @@ document.addEventListener('DOMContentLoaded', function() {
             animate: true,
             nodeRepulsion: 4500,
             idealEdgeLength: 50,
+            randomize: false,
             tile: true,
             tilingPaddingVertical: 10,
             tilingPaddingHorizontal: 10,
@@ -129,22 +134,90 @@ document.addEventListener('DOMContentLoaded', function() {
         }).run();
     }
 
+    function createCyJSON(json) {
+        let res = [];
+        let cnt = 0;
+        for (let i = 0; i < json["ips"].length; i++) {
+            let ip = json["ips"][i]
+            let ipJSON = {};
+            ipJSON["data"] = {};
+            ipJSON["data"]["id"] = ip["address"];
+            ipJSON["data"]["class"] = "ip";
+            ipJSON["group"] = "nodes";
+            res.push(ipJSON);
+
+            for (let j = 0; j < ip["clients"].length; j++) {
+                let client = ip["clients"][j];
+                let clientJSON = {};
+                clientJSON["data"] = {};
+                clientJSON["data"]["id"] = client["name"];
+                clientJSON["data"]["latency"] = client["latency"];
+                clientJSON["data"]["class"] = "client";
+                clientJSON["data"]["parent"] = ip["address"];
+                clientJSON["group"] = "nodes";
+                res.push(clientJSON);
+
+                for (let k = 0; k < client["published"].length; k++) {
+                    let pubEdge = client["published"][k];
+                    let pubEdgeJSON = {};
+                    pubEdgeJSON["data"] = {};
+                    pubEdgeJSON["data"]["id"] = "edge_"+(cnt++);
+                    pubEdgeJSON["data"]["bps"] = pubEdge["bps"];
+                    pubEdgeJSON["data"]["source"] = client["name"];
+                    pubEdgeJSON["data"]["target"] = pubEdge["topic"];
+                    pubEdgeJSON["group"] = "edges";
+                    res.push(pubEdgeJSON);
+                }
+            }
+        }
+
+        for (i = 0; i < json["topics"].length; i++) {
+            let topic = json["topics"][i];
+            let topicJSON = {};
+            topicJSON["data"] = {};
+            topicJSON["data"]["id"] = topic["name"];
+            topicJSON["data"]["class"] = "topic";
+            topicJSON["group"] = "nodes";
+            res.push(topicJSON);
+
+            for (j = 0; j < topic["subscriptions"].length; j++) {
+                let subEdge = topic["subscriptions"][j];
+                let subEdgeJSON = {};
+                subEdgeJSON["data"] = {};
+                subEdgeJSON["data"]["id"] = "edge_"+(cnt++);
+                subEdgeJSON["data"]["bps"] = subEdge["bps"];
+                subEdgeJSON["data"]["source"] = topic["name"];
+                subEdgeJSON["data"]["target"] = subEdge["client"];
+                subEdgeJSON["group"] = "edges";
+                res.push(subEdgeJSON);
+            }
+        }
+        return res;
+    }
+
+    function updateCy(json) {
+        cy.json({ elements: json });
+        runLayout();
+    }
+
     function onMessageArrived(message) {
         var newJSON = JSON.parse(message.payloadString);
         try {
             if (newJSON != undefined && newJSON.length > 0) {
                 if (!paused) {
-                    cy.json({ elements: newJSON });
-                    runLayout();
+                    updateCy(newJSON);
                 }
                 prevJSON.push(newJSON);
+                currIdx = prevJSON.length;
             }
             spinner.style.display = "none";
             uptodate.style.display = "block";
+            spinnerUpdate = false;
             if (!paused) {
                 setTimeout(() => {
                     spinner.style.display = "block";
                     uptodate.style.display = "none";
+                    spinnerUpdate = true;
                 }, 2000);
             }
         }
@@ -154,17 +227,53 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    document.getElementById("pause").addEventListener("click", function() {
-        paused = !paused;
-        if (paused) {
-            this.innerText = "Unpause";
-            spinner.style.display = "none";
-            uptodate.style.display = "block";
+    function timer() {
+        if (spinnerUpdate) {
+            if (paused) {
+                pauseBtn.innerHTML = "&#9658;";
+                spinner.style.display = "none";
+                uptodate.style.display = "block";
+            }
+            else {
+                pauseBtn.innerHTML = "&#10074;&#10074;";
+                spinner.style.display = "block";
+                uptodate.style.display = "none";
+            }
         }
-        else {
-            this.innerText = "Pause";
-            spinner.style.display = "block";
-            uptodate.style.display = "none";
+        requestAnimationFrame(timer);
+    }
+    timer();
+
+    pauseBtn.addEventListener("click", function() {
+        paused = !paused;
+        if (currIdx != prevJSON.length-1) {
+            currIdx = prevJSON.length-1;
+            updateCy(prevJSON[currIdx]);
+        }
+    });
+
+    document.getElementById("forward").addEventListener("click", function() {
+        paused = true;
+        let prevIdx = currIdx;
+        currIdx++;
+        if (currIdx >= prevJSON.length) {
+            currIdx = prevJSON.length-1;
+            paused=false;
+        }
+        if (prevIdx != currIdx) {
+            updateCy(prevJSON[currIdx]);
+        }
+    });
+
+    document.getElementById("reverse").addEventListener("click", function() {
+        paused = true;
+        let prevIdx = currIdx;
+        currIdx--;
+        if (currIdx < 0) {
+            currIdx = 0;
+        }
+        if (prevIdx != currIdx) {
+            updateCy(prevJSON[currIdx]);
         }
     });
 

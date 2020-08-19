@@ -198,10 +198,10 @@ class Benchmark(object):
     def get_avg_lats(self):
         return self.avg_lats[-100:]
 
-    def get_bpms_sent(self):
+    def get_bps_sent(self):
         return self.bytes_sent / self.timeout
 
-    def get_bpms_recvd(self):
+    def get_bps_recvd(self):
         return self.bytes_recvd / self.timeout
 
     def get_dropped_clients(self):
@@ -227,8 +227,8 @@ def main(num_cams, timeout, broker, port, name):
     test.run()
 
     avg_lats = np.mean(test.get_avg_lats())
-    bpms_sent = test.get_bpms_sent()
-    bpms_recvd = test.get_bpms_recvd()
+    bps_sent = test.get_bps_sent()
+    bps_recvd = test.get_bps_recvd()
     dropped_clients = test.get_dropped_clients()
     dropped_packets_percent = test.dropped_packets_percent()
     cpu = np.mean(test.get_cpu())
@@ -237,7 +237,7 @@ def main(num_cams, timeout, broker, port, name):
     print("----- Summary -----")
     print(f"{num_cams} Clients connecting to {broker}:{port} with {timeout} sec timeout:")
     print(f"  {np.mean(avg_lats)} ms response time")
-    print(f"  {bpms_sent} bytes/ms sent | {bpms_recvd} bytes/ms received")
+    print(f"  {bps_sent} bytes/ms sent | {bps_recvd} bytes/ms received")
     print(f"  {dropped_clients} clients dropped | {dropped_packets_percent*100}% packet loss")
     print(f"  {cpu*100}% cpu usage | {mem*100}% mem usage")
 

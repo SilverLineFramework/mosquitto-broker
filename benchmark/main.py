@@ -9,8 +9,8 @@ def make_scene():
 
 def main(max_cams, timeout, broker, port, name, interval):
     avg_lats = []
-    bpms_sent = []
-    bpms_recvd = []
+    bps_sent = []
+    bps_recvd = []
     dropped_clients = []
     dropped_packets_percent = []
     cpu = []
@@ -23,8 +23,8 @@ def main(max_cams, timeout, broker, port, name, interval):
         test.run()
 
         avg_lats += [test.get_avg_lats() if test.get_avg_lats() else [-1] * 100]
-        bpms_sent += [test.get_bpms_sent()]
-        bpms_recvd += [test.get_bpms_recvd()]
+        bps_sent += [test.get_bps_sent()]
+        bps_recvd += [test.get_bps_recvd()]
         dropped_clients += [test.get_dropped_clients()]
         dropped_packets_percent += [test.dropped_packets_percent()]
         cpu += [np.mean(test.get_cpu())]
@@ -33,7 +33,7 @@ def main(max_cams, timeout, broker, port, name, interval):
         print("----- Summary -----")
         print(f"{num_cams} Clients connecting to {broker}:{port} with {timeout} sec timeout:")
         print(f"  {np.mean(avg_lats[-1])} ms response time")
-        print(f"  {bpms_sent[-1]} bytes/ms sent | {bpms_recvd[-1]} bytes/ms received")
+        print(f"  {bps_sent[-1]} bytes/ms sent | {bps_recvd[-1]} bytes/ms received")
         print(f"  {dropped_clients[-1]} clients dropped | {dropped_packets_percent[-1]*100}% packet loss")
         print(f"  {cpu[-1]*100}% cpu usage | {mem[-1]*100}% mem usage")
         print()
@@ -42,8 +42,8 @@ def main(max_cams, timeout, broker, port, name, interval):
         time.sleep(1)
 
     avg_lats = np.array(avg_lats)
-    bpms_sent = np.array(bpms_sent)
-    bpms_recvd = np.array(bpms_recvd)
+    bps_sent = np.array(bps_sent)
+    bps_recvd = np.array(bps_recvd)
     dropped_clients = np.array(dropped_clients)
     dropped_packets_percent = np.array(dropped_packets_percent)
     cpu = np.array(cpu)
@@ -51,7 +51,7 @@ def main(max_cams, timeout, broker, port, name, interval):
 
     np.savez(f"data/benchmark_{name}_c{num_cams}_i{interval}",
                 avg_lats=avg_lats,
-                bpms_sent=bpms_sent, bpms_recvd=bpms_recvd,
+                bps_sent=bps_sent, bps_recvd=bps_recvd,
                 dropped_clients=dropped_clients, dropped_packets_percent=dropped_packets_percent,
                 cpu=cpu, mem=mem)
 

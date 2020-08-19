@@ -1,13 +1,10 @@
 #ifndef NETWORK_GRAPH_H
 #define NETWORK_GRAPH_H
 
-#include <cJSON/cJSON.h>
-
 #include "mosquitto.h"
 
 struct client;
 struct topic;
-
 
 /**
  * @brief Subscription Edge structure. Points to a client that is subcribed to
@@ -15,7 +12,6 @@ struct topic;
  */
 struct sub_edge
 {
-    cJSON *json;                        /**< edge JSON */
     struct client *sub;                 /**< pointer to client that is subbed to topic */
     struct sub_edge *next;
     struct sub_edge *prev;
@@ -28,7 +24,6 @@ struct sub_edge
 struct pub_edge
 {
     int ttl_cnt;                        /**< "time to live counter", if == 0, delete */
-    cJSON *json;                        /**< edge JSON */
     struct topic *pub;                  /**< pointer to topic that is client is pubbed to */
     struct pub_edge *next;
     struct pub_edge *prev;
@@ -44,15 +39,14 @@ struct topic
 {
     uint8_t retain;                     /**< whether or not topic is retained for ttl_cnt seconds */
     int ttl_cnt;                        /**< "ttl counter", if == 0, delete */
-    char *full_name;                    /**< full topic name */
-    cJSON *json;                        /**< topic JSON */
+    char *name;                         /**< full topic name */
     struct topic *next;
     struct topic *prev;
     struct sub_edge *sub_list;          /**< list of all subscriptions */
     uint16_t ref_cnt;                   /**< # of clients pubbed to topic */
     uint16_t bytes;
     double bytes_per_sec;               /**< outgoing bytes/s from topic */
-    unsigned long hash;                 /**< hash(full_name) */
+    unsigned long hash;                 /**< hash(name) */
 };
 
 /**
@@ -62,12 +56,13 @@ struct topic
  */
 struct client
 {
+    char *name;
     bool latency_ready;
     uint16_t latency_cnt;               /**< num times latency has been recved */
-    cJSON *json;                        /**< client JSON */
+    double latency_avg_ms;
     struct client *next;
     struct client *prev;
-    struct pub_edge *pub_list;          /**< current topic client is pubbing to */
+    struct pub_edge *pub_list;          /**< current topics client is pubbing to */
     time_t latency;                     /**< response time in ns */
     time_t latency_total;               /**< total response time in ns */
     unsigned long hash;                 /**< hash(client_id) */
@@ -79,7 +74,7 @@ struct client
  */
 struct ip_container
 {
-    cJSON *json;
+    char *address;
     struct ip_container *next;
     struct ip_container *prev;
     struct client_dict *client_dict;    /**< dict of all clients with specific IP address */

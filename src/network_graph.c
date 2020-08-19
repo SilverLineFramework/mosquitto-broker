@@ -20,13 +20,6 @@
 #define GRAPH_QOS   2
 #define BUFLEN      100
 
-// Useful constants //
-const char s[2] = "/";
-const char *nodes = "nodes";
-const char *ip_class = "ip";
-const char *client_class = "client";
-const char *topic_class = "topic";
-
 /*****************************************************************************/
 
 static struct network_graph *graph = NULL;
@@ -111,84 +104,6 @@ char *graph__strdup(const char *s) {
 /*****************************************************************************/
 
 /*
- * Creates a template cJSON struct to be used by all nodes/edges
- */
-static cJSON *create_generic_json(const char *id) {
-    cJSON *root, *data;
-    root = cJSON_CreateObject();
-    data = cJSON_CreateObject();
-
-    cJSON_AddItemToObject(data, "id", cJSON_CreateString(id));
-    cJSON_AddItemToObject(root, "data", data);
-
-    return root;
-}
-
-/*
- * Creates a cJSON struct for an IP container
- */
-static cJSON *create_ip_json(const char *address) {
-    cJSON *root, *data;
-    root = create_generic_json(address);
-    data = cJSON_GetObjectItem(root, "data");
-
-    cJSON_AddItemToObject(data, "class", cJSON_CreateString(ip_class));
-    cJSON_AddItemToObject(root, "group", cJSON_CreateString(nodes));
-
-    return root;
-}
-
-/*
- * Creates a cJSON struct for an edge
- */
-static cJSON *create_edge_json(const char *node1, const char *node2) {
-    cJSON *root, *data;
-    char buf[BUFLEN];
-    static unsigned int i = 0;
-
-    snprintf(buf, BUFLEN, "edge_%d", i++);
-    root = create_generic_json(buf);
-    data = cJSON_GetObjectItem(root, "data");
-
-    cJSON_AddNumberToObject(data, "bps", 0.0);
-    cJSON_AddItemToObject(data, "source", cJSON_CreateString(node1));
-    cJSON_AddItemToObject(data, "target", cJSON_CreateString(node2));
-    cJSON_AddItemToObject(root, "group", cJSON_CreateString("edges"));
-
-    return root;
-}
-
-/*
- * Creates a cJSON struct for a client node
- */
-static cJSON *create_client_json(const char *client, const char *parent) {
-    cJSON *root, *data;
-    root = create_generic_json(client);
-    data = cJSON_GetObjectItem(root, "data");
-
-    cJSON_AddNumberToObject(data, "latency", NAN);
-    cJSON_AddItemToObject(data, "class", cJSON_CreateString(client_class));
-    cJSON_AddItemToObject(data, "parent", cJSON_CreateString(parent));
-    cJSON_AddItemToObject(root, "group", cJSON_CreateString(nodes));
-
-    return root;
-}
-
-/*
- * Creates a cJSON struct for a topic node
- */
-static cJSON *create_topic_json(const char *topic) {
-    cJSON *root, *data;
-    root = create_generic_json(topic);
-    data = cJSON_GetObjectItem(root, "data");
-
-    cJSON_AddItemToObject(data, "class", cJSON_CreateString(topic_class));
-    cJSON_AddItemToObject(root, "group", cJSON_CreateString(nodes));
-
-    return root;
-}
-
-/*
  * Creates an ip container struct from a given IP address
  */
 static struct ip_container *create_ip_container(const char *ip) {
@@ -196,7 +111,7 @@ static struct ip_container *create_ip_container(const char *ip) {
     if (!ip_cont) {
         return NULL;
     }
-    ip_cont->json = create_ip_json(ip);
+    ip_cont->address = graph__strdup(ip);
     ip_cont->next = NULL;
     ip_cont->prev = NULL;
 
@@ -228,7 +143,8 @@ static struct client *create_client(const char *id, const char *address) {
     client->latency_ready = false;
     client->latency_total = 0;
     client->latency_cnt = 0;
-    client->json = create_client_json(id, address);
+    client->latency_avg_ms = NAN;
+    client->name = graph__strdup(id);
     client->pub_list = NULL;
     client->next = NULL;
     client->prev = NULL;
@@ -244,8 +160,7 @@ static struct topic *create_topic(const char *name, uint8_t retain) {
     if (!topic) return NULL;
     topic->retain = retain;
     topic->ttl_cnt = ttl_cnt;
-    topic->full_name = graph__strdup(name);
-    topic->json = create_topic_json(name);
+    topic->name = graph__strdup(name);
     topic->next = NULL;
     topic->prev = NULL;
     topic->sub_list = NULL;
@@ -264,7 +179,6 @@ static struct topic *create_topic(const char *name, uint8_t retain) {
 static struct sub_edge *create_sub_edge(const char *src, const char *tgt) {
     struct sub_edge *sub_edge = (struct sub_edge *)graph__malloc(sizeof(struct sub_edge));
     if (!sub_edge) return NULL;
-    sub_edge->json = create_edge_json(src, tgt);
     sub_edge->sub = NULL;
     sub_edge->next = NULL;
     sub_edge->prev = NULL;
@@ -281,7 +195,6 @@ static struct pub_edge *create_pub_edge(const char *src, const char *tgt, struct
     struct pub_edge *pub_edge = (struct pub_edge *)graph__malloc(sizeof(struct pub_edge));
     if (!pub_edge) return NULL;
     pub_edge->ttl_cnt = ttl_cnt;
-    pub_edge->json = create_edge_json(src, tgt);
     pub_edge->pub = topic;
     pub_edge->next = NULL;
     pub_edge->prev = NULL;
@@ -519,7 +432,6 @@ static int graph_delete_topic_sub_edges(struct topic *topic) {
     while (curr != NULL) {
         temp = curr;
         curr = curr->next;
-        cJSON_Delete(temp->json);
         graph__free(temp);
     }
     topic->sub_list = NULL;
@@ -548,8 +460,7 @@ static inline void graph_detach_topic(struct topic *topic) {
 static int graph_delete_topic(struct topic *topic) {
     graph_detach_topic(topic);
     graph_delete_topic_sub_edges(topic);
-    cJSON_Delete(topic->json);
-    graph__free(topic->full_name);
+    graph__free(topic->name);
     graph__free(topic);
 
     --graph->topic_dict->used;
@@ -581,7 +492,6 @@ static int graph_delete_sub(struct topic *topic, struct sub_edge *sub_edge) {
     if (sub_edge->prev != NULL) {
         sub_edge->prev->next = sub_edge->next;
     }
-    cJSON_Delete(sub_edge->json);
     graph__free(sub_edge);
     return 0;
 }
@@ -633,7 +543,6 @@ static int graph_delete_client_pub_edges(struct client *client) {
         temp = curr;
         curr = curr->next;
         pub_edge_decr_ref_cnt(temp);
-        cJSON_Delete(temp->json);
         graph__free(temp);
     }
     client->pub_list = NULL;
@@ -654,7 +563,6 @@ static int graph_delete_pub(struct client *client, struct pub_edge *pub_edge) {
         pub_edge->prev->next = pub_edge->next;
     }
     pub_edge_decr_ref_cnt(pub_edge);
-    cJSON_Delete(pub_edge->json);
     graph__free(pub_edge);
     return 0;
 }
@@ -683,7 +591,7 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
     if (ip_cont->prev != NULL) {
         ip_cont->prev->next = ip_cont->next;
     }
-    cJSON_Delete(ip_cont->json);
+    graph__free(ip_cont->address);
     graph__free(ip_cont->client_dict->client_list);
     graph__free(ip_cont->client_dict);
     graph__free(ip_cont);
@@ -720,7 +628,7 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
     }
 
     graph_delete_client_pub_edges(client);
-    cJSON_Delete(client->json);
+    graph__free(client->name);
     graph__free(client);
 
     if (ip_cont->client_dict->used < ip_cont->client_dict->max_size / 4) {
@@ -783,13 +691,13 @@ int network_graph_cleanup(void) {
                 while (client_curr != NULL) {
                     client_temp = client_curr;
                     client_curr = client_curr->next;
-                    cJSON_Delete(client_curr->json);
+                    graph__free(client_curr->name);
                     graph__free(client_curr);
                 }
             }
             ip_temp = ip_curr;
             ip_curr = ip_curr->next;
-            cJSON_Delete(ip_temp->json);
+            graph__free(ip_temp->address);
             graph__free(ip_temp->client_dict->client_list);
             graph__free(ip_temp->client_dict);
             graph__free(ip_temp);
@@ -802,8 +710,7 @@ int network_graph_cleanup(void) {
             topic_temp = topic_curr;
             topic_curr = topic_curr->next;
             graph_delete_topic_sub_edges(topic_temp);
-            cJSON_Delete(topic_temp->json);
-            free(topic_temp->full_name);
+            free(topic_temp->name);
             graph__free(topic_temp);
         }
     }
@@ -937,7 +844,7 @@ int network_graph_add_sub_edge(struct mosquitto *context, const char *topic) {
 
     topic_vert = find_topic(topic);
     if (topic_vert && find_sub_edge(topic_vert, client) == NULL) {
-        sub_edge = create_sub_edge(topic_vert->full_name, id);
+        sub_edge = create_sub_edge(topic_vert->name, id);
         sub_edge->sub = client;
         graph_add_sub_edge(topic_vert, sub_edge);
         graph->changed = true;
@@ -968,7 +875,7 @@ int network_graph_delete_sub_edge(struct mosquitto *context, const char *topic) 
     for (size_t i = 0; i < graph->topic_dict->max_size; ++i) {
         topic_vert = graph->topic_dict->topic_list[i];
         for (; topic_vert != NULL; topic_vert = topic_vert->next) {
-            mosquitto_topic_matches_sub(topic, topic_vert->full_name, &match);
+            mosquitto_topic_matches_sub(topic, topic_vert->name, &match);
             if (match) {
                 graph_delete_sub_edge(topic_vert, client);
             }
@@ -1049,10 +956,7 @@ int network_graph_latency_end(struct mosquitto *context) {
         ++client->latency_cnt;
 
         latency_avg_ns = (double)client->latency_total / client->latency_cnt;
-
-        data = cJSON_GetObjectItem(client->json, "data");
-        cJSON_SetNumberValue(cJSON_GetObjectItem(data, "latency"),
-                             round3(latency_avg_ns / 1000)); // ns -> ms
+        client->latency_avg_ms = round3(latency_avg_ns / 1000); // ms
         client->latency_ready = false;
 
         graph->changed = true;
@@ -1088,6 +992,107 @@ int network_graph_delete_client(struct mosquitto *context) {
     return 0;
 }
 
+cJSON *graph_json_create() {
+    /*
+    {
+        "ips": [],
+        "topics": []
+    }
+    */
+
+    cJSON *root, *ips, *topics;
+    root = cJSON_CreateObject();
+    ips = cJSON_CreateArray();
+    topics = cJSON_CreateArray();
+    cJSON_AddItemToObject(root, "ips", ips);
+    cJSON_AddItemToObject(root, "topics", topics);
+    return root;
+}
+
+cJSON *graph_json_add_ip(cJSON *root, struct ip_container *ip) {
+    /*
+    {
+        "address": "127.0.0.1",
+        "clients": []
+    }
+    */
+
+    cJSON *ip_json, *ips;
+    ips = cJSON_GetObjectItem(root, "ips");
+    ip_json = cJSON_CreateObject();
+    cJSON_AddStringToObject(ip_json, "address", ip->address);
+    cJSON_AddItemToObject(ip_json, "clients", cJSON_CreateArray());
+    cJSON_AddItemToArray(ips, ip_json);
+    return ip_json;
+}
+
+cJSON *ip_json_add_client(cJSON *ip_json, struct client *client) {
+    /*
+    {
+        "name": "client1",
+        "latency": 400,
+        "published": []
+    }
+    */
+
+    cJSON *client_json, *clients;
+    clients = cJSON_GetObjectItem(ip_json, "clients");
+    client_json = cJSON_CreateObject();
+    cJSON_AddStringToObject(client_json, "name", client->name);
+    cJSON_AddNumberToObject(client_json, "latency", client->latency_avg_ms);
+    cJSON_AddItemToObject(client_json, "published", cJSON_CreateArray());
+    cJSON_AddItemToArray(clients, client_json);
+    return client_json;
+}
+
+void client_json_add_pub(cJSON *client, struct pub_edge *pub_edge) {
+    /*
+        {
+            "topic": "topic1/sub_topic1",
+            "bps": 9000
+        }
+    */
+
+    cJSON *topic_json, *topics;
+    topics = cJSON_GetObjectItem(client, "published");
+    topic_json = cJSON_CreateObject();
+    cJSON_AddStringToObject(topic_json, "topic", pub_edge->pub->name);
+    cJSON_AddNumberToObject(topic_json, "bps", pub_edge->pub->bytes_per_sec);
+    cJSON_AddItemToArray(topics, topic_json);
+}
+
+cJSON *graph_json_add_topic(cJSON *root, struct topic *topic) {
+    /*
+    {
+        "name": "topic1/sub_topic1",
+        "subscriptions": []
+    }
+    */
+
+    cJSON *topic_json, *topics;
+    topics = cJSON_GetObjectItem(root, "topics");
+    topic_json = cJSON_CreateObject();
+    cJSON_AddStringToObject(topic_json, "name", topic->name);
+    cJSON_AddItemToObject(topic_json, "subscriptions", cJSON_CreateArray());
+    cJSON_AddItemToArray(topics, topic_json);
+    return topic_json;
+}
+
+void topic_json_add_sub(cJSON *topic, struct sub_edge *sub_edge, double bytes_per_sec) {
+    /*
+    {
+        "client": "client1",
+        "bps": 9000
+    }
+    */
+    cJSON *sub_json, *subs;
+    subs = cJSON_GetObjectItem(topic, "subscriptions");
+    sub_json = cJSON_CreateObject();
+    cJSON_AddStringToObject(sub_json, "client", sub_edge->sub->name);
+    cJSON_AddNumberToObject(sub_json, "bps", bytes_per_sec);
+    cJSON_AddItemToArray(subs, sub_json);
+}
+
 /*
  * Called every graph->interval seconds
  */
@@ -1099,50 +1104,47 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
     time_t now = mosquitto_time();
 
     char *json_buf, heap_buf[BUFLEN];
-    cJSON *root, *data;
+    cJSON *root, *ip_json, *client_json, *topic_json;
 
     struct ip_container *ip_cont;
     struct client *client;
     struct sub_edge *sub_edge;
-    struct pub_edge *pub_edge, *pub_edge_temp;
+    struct pub_edge *pub_edge, *pub_edge_curr;
     struct topic *topic, *temp;
 
     double temp_bytes;
 
     if (interval && now - interval > last_update) {
-        root = cJSON_CreateArray();
+        root = graph_json_create();
 
         // graph has a list of all IP addresses
         for (size_t i = 0; i < graph->ip_dict->max_size; ++i) {
             ip_cont = graph->ip_dict->ip_list[i];
 
             for (; ip_cont != NULL; ip_cont = ip_cont->next) {
-                cJSON_AddItemToArray(root, cJSON_Duplicate(ip_cont->json, true));
+                ip_json = graph_json_add_ip(root, ip_cont);
 
                 for (size_t j = 0; j < ip_cont->client_dict->max_size; ++j) {
                     client = ip_cont->client_dict->client_list[j];
 
                     for (; client != NULL; client = client->next) {
-                        cJSON_AddItemToArray(root, cJSON_Duplicate(client->json, true));
+                        client_json = ip_json_add_client(ip_json, client);
 
                         pub_edge = client->pub_list;
                         while (pub_edge != NULL) { // client may have published topics
-                            pub_edge_temp = pub_edge;
+                            pub_edge_curr = pub_edge;
                             pub_edge = pub_edge->next;
 
-                            temp_bytes = (double)pub_edge_temp->bytes / (now - last_update);
-                            pub_edge_temp->bytes = 0;
-                            pub_edge_temp->bytes_per_sec = round3(temp_bytes);
+                            temp_bytes = (double)pub_edge_curr->bytes / (now - last_update);
+                            pub_edge_curr->bytes = 0;
+                            pub_edge_curr->bytes_per_sec = round3(temp_bytes);
 
-                            if (pub_edge_temp->bytes_per_sec == 0.0 && --pub_edge_temp->ttl_cnt <= 0) {
-                                graph_delete_pub(client, pub_edge_temp);
+                            if (pub_edge_curr->bytes_per_sec == 0.0 && --pub_edge_curr->ttl_cnt <= 0) {
+                                graph_delete_pub(client, pub_edge_curr);
                                 graph->changed = true;
                             }
                             else {
-                                // update outgoing bytes/s from client and add json
-                                data = cJSON_GetObjectItem(pub_edge_temp->json, "data");
-                                cJSON_SetNumberValue(cJSON_GetObjectItem(data, "bps"), pub_edge_temp->bytes_per_sec);
-                                cJSON_AddItemToArray(root, cJSON_Duplicate(pub_edge_temp->json, true));
+                                client_json_add_pub(client_json, pub_edge_curr);
                             }
                         }
                     }
@@ -1162,7 +1164,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                     graph->changed = true;
                 }
                 else {
-                    cJSON_AddItemToArray(root, cJSON_Duplicate(topic->json, true));
+                    topic_json = graph_json_add_topic(root, topic);
 
                     // update incoming bytes/s to topic
                     temp_bytes = (double)topic->bytes / (now - last_update);
@@ -1172,10 +1174,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
                     sub_edge = topic->sub_list;
                     // each topic has a list of subscribed clients
                     for (; sub_edge != NULL; sub_edge = sub_edge->next) {
-                        // update outgoing bytes/s from topic
-                        data = cJSON_GetObjectItem(sub_edge->json, "data");
-                        cJSON_SetNumberValue(cJSON_GetObjectItem(data, "bps"), topic->bytes_per_sec);
-                        cJSON_AddItemToArray(root, cJSON_Duplicate(sub_edge->json, true));
+                        topic_json_add_sub(topic_json, sub_edge, topic->bytes_per_sec);
                     }
                     topic = topic->next;
                 }

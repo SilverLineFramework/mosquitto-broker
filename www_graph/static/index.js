@@ -146,13 +146,75 @@ document.addEventListener('DOMContentLoaded', function() {
         }).run();
     }
 
+    function createCyJSON(json) {
+        let res = [];
+        let cnt = 0;
+        for (let i = 0; i < json["ips"].length; i++) {
+            let ip = json["ips"][i]
+            let ipJSON = {};
+            ipJSON["data"] = {};
+            ipJSON["data"]["id"] = ip["address"];
+            ipJSON["data"]["class"] = "ip";
+            ipJSON["group"] = "nodes";
+            res.push(ipJSON);
+
+            for (let j = 0; j < ip["clients"].length; j++) {
+                let client = ip["clients"][j];
+                let clientJSON = {};
+                clientJSON["data"] = {};
+                clientJSON["data"]["id"] = client["name"];
+                clientJSON["data"]["latency"] = client["latency"];
+                clientJSON["data"]["class"] = "client";
+                clientJSON["data"]["parent"] = ip["address"];
+                clientJSON["group"] = "nodes";
+                res.push(clientJSON);
+
+                for (let k = 0; k < client["published"].length; k++) {
+                    let pubEdge = client["published"][k];
+                    let pubEdgeJSON = {};
+                    pubEdgeJSON["data"] = {};
+                    pubEdgeJSON["data"]["id"] = "edge_"+(cnt++);
+                    pubEdgeJSON["data"]["bps"] = pubEdge["bps"];
+                    pubEdgeJSON["data"]["source"] = client["name"];
+                    pubEdgeJSON["data"]["target"] = pubEdge["topic"];
+                    pubEdgeJSON["group"] = "edges";
+                    res.push(pubEdgeJSON);
+                }
+            }
+        }
+
+        for (i = 0; i < json["topics"].length; i++) {
+            let topic = json["topics"][i];
+            let topicJSON = {};
+            topicJSON["data"] = {};
+            topicJSON["data"]["id"] = topic["name"];
+            topicJSON["data"]["class"] = "topic";
+            topicJSON["group"] = "nodes";
+            res.push(topicJSON);
+
+            for (j = 0; j < topic["subscriptions"].length; j++) {
+                let subEdge = topic["subscriptions"][j];
+                let subEdgeJSON = {};
+                subEdgeJSON["data"] = {};
+                subEdgeJSON["data"]["id"] = "edge_"+(cnt++);
+                subEdgeJSON["data"]["bps"] = subEdge["bps"];
+                subEdgeJSON["data"]["source"] = topic["name"];
+                subEdgeJSON["data"]["target"] = subEdge["client"];
+                subEdgeJSON["group"] = "edges";
+                res.push(subEdgeJSON);
+            }
+        }
+        return res;
+    }
+
     function onMessageArrived(message) {
-        var newJSON = JSON.parse(message.payloadString);
+        let newJSON = JSON.parse(message.payloadString);
         msgText.value = JSON.stringify(newJSON, undefined, 4);
         try {
-            if (newJSON != undefined && newJSON.length > 0) {
+            let cyJSON = createCyJSON(newJSON);
+            if (newJSON != undefined && cyJSON.length > 0) {
                 if (!paused) {
-                    cy.json({ elements: newJSON });
+                    cy.json({ elements: cyJSON });
                     runLayout();
                 }
                 prevJSON.push(newJSON);
