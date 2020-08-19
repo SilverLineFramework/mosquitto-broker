@@ -15,10 +15,11 @@ def main(max_cams, timeout, broker, port, name, interval):
     dropped_packets_percent = []
     cpu = []
     mem = []
+    print()
     for num_cams in range(1, max_cams+interval, interval):
         print(f"----- Running Benchmark with {num_cams} Clients -----")
 
-        test = Benchmark(f"{name}_c{num_cams}", num_cams, timeout*60000, broker, port, make_scene())
+        test = Benchmark(f"{name}_c{num_cams}", num_cams, timeout*60, broker, port, make_scene())
         test.run()
 
         avg_lats += [test.get_avg_lats() if test.get_avg_lats() else [-1] * 100]
@@ -31,12 +32,13 @@ def main(max_cams, timeout, broker, port, name, interval):
 
         print("----- Summary -----")
         print(f"{num_cams} Clients connecting to {broker}:{port} with {timeout} sec timeout:")
-        print(f"{np.mean(avg_lats[-1])} ms | {bpms_sent[-1]} bytes/ms sent | {bpms_recvd[-1]} bytes/ms received")
-        print(f"{dropped_clients[-1]} clients dropped | {dropped_packets_percent[-1]*100}% packet loss | {cpu[-1]*100}% cpu usage | {mem[-1]*100}% mem usage")
+        print(f"  {np.mean(avg_lats[-1])} ms response time")
+        print(f"  {bpms_sent[-1]} bytes/ms sent | {bpms_recvd[-1]} bytes/ms received")
+        print(f"  {dropped_clients[-1]} clients dropped | {dropped_packets_percent[-1]*100}% packet loss")
+        print(f"  {cpu[-1]*100}% cpu usage | {mem[-1]*100}% mem usage")
         print()
 
         test.save()
-
         time.sleep(1)
 
     avg_lats = np.array(avg_lats)
@@ -60,11 +62,11 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--broker", type=str, help="Broker to connect to",
                         default="oz.andrew.cmu.edu")
     parser.add_argument("-p", "--port", type=int, help="Port to connect to",
-                        default=9001)
+                        default=1883)
     parser.add_argument("-n", "--name", type=str, help="Optional name for saved plot",
                         default="benchmark")
     parser.add_argument("-t", "--timeout", type=float, help="Amount of mins to wait before ending data collection",
-                        default=3.0) # default is 3 mins
+                        default=2.0) # default is 2 mins
     parser.add_argument("-i", "--interval", type=int, help="Interval of clients for benchmarking",
                         default=1)
     args = parser.parse_args()

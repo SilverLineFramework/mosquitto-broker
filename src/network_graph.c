@@ -1,6 +1,6 @@
 #include <string.h>
 #include <math.h>
-#include <../cJSON/cJSON.h>
+#include <cJSON/cJSON.h>
 
 #  if defined(__APPLE__)
 #    include <malloc/malloc.h>

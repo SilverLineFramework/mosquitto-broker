@@ -3,6 +3,9 @@ import time, random, string
 def time_ms():
     return time.time()*1000
 
+def time_s():
+    return time.time()
+
 def rand_str(N):
     return "".join(random.choice(string.ascii_lowercase+string.digits) for i in range(N))
 

@@ -8,10 +8,7 @@ plt.style.use("seaborn-whitegrid")
 def plot_data(name, bound, data):
     interval = int(name.split("_")[-1][1:])
 
-    if bound < 0:
-        bound = len(data["avg_lats"])
-    else:
-        bound //= interval
+    bound = len(data["avg_lats"]) if bound < 0 else bound // interval
 
     avg_lats = data["avg_lats"][:bound]
     mbps_sent = data["bpms_sent"][:bound] * 0.001 # turn to Mb/s
@@ -21,7 +18,7 @@ def plot_data(name, bound, data):
     cpu = data["cpu"][:bound] * 100
     mem = data["mem"][:bound] * 100
 
-    clients = [interval*int(n) for n in range(1, avg_lats.shape[0]+1)][:bound]
+    clients = [1]+[interval*n for n in range(1, avg_lats.shape[0])][:bound]
 
     try:
         std_lats = np.std(avg_lats, axis=1)[:bound]
@@ -52,21 +49,21 @@ def plot_data(name, bound, data):
     # plot bandwidth and dropped packets
     plt.figure()
     plt.subplot(3, 1, 1)
-    plt.title("Bytes Received")
-    plt.ylabel("MB/s")
-    plt.plot(clients, mbps_recvd, "--b.", label="received")
+    plt.title("Sent to Broker")
+    plt.ylabel("MBytes/s")
+    plt.plot(clients, mbps_sent, "--.", label="sent", color="orange")
     plt.grid(None)
 
     plt.subplot(3, 1, 2)
-    plt.title("Bytes Sent")
-    plt.ylabel("MB/s")
-    plt.plot(clients, mbps_sent, "--.", label="sent", color="orange")
+    plt.title("Received from Broker")
+    plt.ylabel("MBytes/s")
+    plt.plot(clients, mbps_recvd, "--b.", label="received")
     plt.grid(None)
 
     plt.subplot(3, 1, 3)
     plt.title("% Packet Loss")
     plt.xlabel("Number of Clients")
-    plt.ylabel("% Dropped Packets")
+    plt.ylabel("% Packet Loss")
     plt.plot(clients, dropped_packets_percent, "--g.")
     plt.grid(None)
 
@@ -87,6 +84,7 @@ def plot_data(name, bound, data):
     plt.ylabel("% Virtual Memory")
     plt.plot(clients, mem, "--.", color="orange")
     plt.grid(None)
+
     plt.tight_layout()
     plt.savefig(f"plots/{name}_cpu+mem.png")
 

@@ -32,10 +32,11 @@ def main():
         print("ERROR: mosquitto not running!")
         return
 
-    start_t = time_ms()
+    prev_t = 0
     while True:
-        now = time_ms()
-        if int(now - start_t) % 100 == 0: # 10 Hz
+        now_t = time_s()
+        if (now_t - prev_t) >= 1.0/10.0: # 10 Hz
+            prev_t = now_t
             msg["cpu"] = mosquitto_ps.cpu_percent(interval=0.1)
             msg["mem"] = mosquitto_ps.memory_percent()
             if msg != prev_msg:

@@ -51,7 +51,7 @@ class Benchmark(object):
         self.mem = []
 
         self.lat_lock = Lock()
-        self.queue_lock = Lock()
+        self.queues_lock = Lock()
         self.drop_lock = Lock()
 
         self.dropped_clients_queue = Queue()
@@ -78,21 +78,25 @@ class Benchmark(object):
         self.client.loop_start()
 
         ps = [Process(target=self.move_cam, args=()) for _ in range(self.num_cams)]
+        for p in ps:
+            p.daemon = True
+            p.start()
 
-        for i in range(self.num_cams):
-            ps[i].start()
-            if i != 0 and i % 10 == 0:
-                time.sleep(1)
+        time.sleep(0.5)
 
         print(f"Started! Scene is {self.scene}")
         self.start_flag.set()
+
         start_t = time_ms()
         self.collect()
-        self.elapsed = time_ms() - start_t
-        time.sleep(1)
+
+        time.sleep(0.5)
 
         self.client.loop_stop()
         self.client.disconnect()
+
+        print("waiting for processes to finish")
+        for p in ps: p.join()
 
         while self.dropped_clients_queue.qsize() > 0:
             self.dropped_clients += self.dropped_clients_queue.get()
@@ -105,44 +109,44 @@ class Benchmark(object):
         while self.bytes_recvd_queue.qsize() > 0:
             self.bytes_recvd += self.bytes_recvd_queue.get()
 
-        for p in ps:
-            p.join()
-
         print("done!")
 
     def collect(self):
         iters = 0
-        start_t = time_ms()
+        start_t = time_s()
+        prev_t = 0
         while True:
-            now = time_ms()
-            if int(now - start_t) % 100 == 0: # 10 Hz
+            now_t = time_s()
+            if (now_t - prev_t) >= 1.0/10.0: # 10 Hz
+                prev_t = now_t
+
                 self.lat_lock.acquire()
                 if self.lat_cnt.value > 0:
                     self.avg_lats += [self.lat_temp.value / self.lat_cnt.value]
-                    self.times += [(now - start_t) / 1000] # secs
+                    self.times += [now_t - start_t] # secs
                 self.lat_lock.release()
 
-            if iters % 5000 == 0:
-                sys.stdout.write(".")
-                sys.stdout.flush()
+                iters += 1
+                if iters % 100 == 0:
+                    sys.stdout.write(".")
+                    sys.stdout.flush()
 
-            if int(now - start_t) > self.timeout:
+            if (now_t - start_t) >= self.timeout:
                 self.killer.kill_now.value = 1
                 print("Timeout reached, exiting...")
                 break
 
-            # if len(self.avg_lats) > 100 and rmsd(self.avg_lats[-100:]) < 0.00005:
-            #     self.killer.kill_now.value = 1
-            #     print("RMSD threshold crossed, exiting...")
-            #     break
+            if len(self.avg_lats) > 100 and rmsd(self.avg_lats[-100:]) < 0.00005:
+                self.killer.kill_now.value = 1
+                print("RMSD threshold crossed, exiting...")
+                break
 
             if self.killer.kill_now.value:
                 if input("End Benchmark [y/n]? ") == "y":
                     break
                 self.killer.kill_now.value = 0
 
-            iters += 1
-            time.sleep(0.005)
+            time.sleep(0.001)
 
     def create_cam(self):
         cam = Camera(f"cam{rand_num(5)}", self.scene, rand_color())
@@ -159,14 +163,15 @@ class Benchmark(object):
             return
 
         self.start_flag.wait()
+        iters = 0
 
-        start_t = time_ms()
+        prev_t = 0
         while True:
-            if self.killer.kill_now.value:
-                break
+            now_t = time_s()
+            if (now_t - prev_t) >= 1.0/10.0: # 10 Hz
+                prev_t = now_t
+                iters += 1
 
-            now = time_ms()
-            if int(now - start_t) % 100 == 0: # 10 Hz
                 cam.move()
                 if cam.get_avg_lat() is not None:
                     self.lat_lock.acquire()
@@ -174,25 +179,30 @@ class Benchmark(object):
                     self.lat_cnt.value += 1
                     self.lat_lock.release()
 
-            time.sleep(0.005)
+            if self.killer.kill_now.value:
+                break
 
-        self.queue_lock.acquire()
+            time.sleep(0.001)
+
+        # print(len(cam.client._out_packet), len(cam.client._in_packet))
+        cam.disconnect()
+        # print("here")
+
+        self.queues_lock.acquire()
         self.bytes_sent_queue.put(cam.get_bytes_sent())
         self.bytes_recvd_queue.put(cam.get_bytes_recvd())
         self.packets_sent_queue.put(cam.get_packets_sent())
         self.packets_recvd_queue.put(cam.get_packets_recvd())
-        self.queue_lock.release()
-
-        cam.disconnect()
+        self.queues_lock.release()
 
     def get_avg_lats(self):
         return self.avg_lats[-100:]
 
     def get_bpms_sent(self):
-        return self.bytes_sent / self.elapsed
+        return self.bytes_sent / self.timeout
 
     def get_bpms_recvd(self):
-        return self.bytes_recvd / self.elapsed
+        return self.bytes_recvd / self.timeout
 
     def get_dropped_clients(self):
         return self.dropped_clients
@@ -210,9 +220,10 @@ class Benchmark(object):
         np.savez(f"data/client_{self.name}", times=np.array(self.times), avg_lats=np.array(self.avg_lats))
 
 def main(num_cams, timeout, broker, port, name):
+    print()
     print(f"----- Running benchmark with {num_cams} clients -----")
 
-    test = Benchmark(name, num_cams, timeout*60000, broker, port, "benchmark_"+rand_str(5))
+    test = Benchmark(f"{name}_c{num_cams}", num_cams, timeout*60, broker, port, "benchmark_"+rand_str(5))
     test.run()
 
     avg_lats = np.mean(test.get_avg_lats())
@@ -224,13 +235,16 @@ def main(num_cams, timeout, broker, port, name):
     mem = np.mean(test.get_mem())
 
     print("----- Summary -----")
-    print(f"{num_cams} clients:")
-    print(f"{np.mean(avg_lats)} ms | {bpms_sent} bytes/ms sent | {bpms_recvd} bytes/ms received")
-    print(f"{dropped_clients} clients dropped | {dropped_packets_percent*100}% packet loss | {cpu*100}% cpu usage | {mem*100}% mem usage")
+    print(f"{num_cams} Clients connecting to {broker}:{port} with {timeout} sec timeout:")
+    print(f"  {np.mean(avg_lats)} ms response time")
+    print(f"  {bpms_sent} bytes/ms sent | {bpms_recvd} bytes/ms received")
+    print(f"  {dropped_clients} clients dropped | {dropped_packets_percent*100}% packet loss")
+    print(f"  {cpu*100}% cpu usage | {mem*100}% mem usage")
 
     test.save()
 
     print("------------------------------------------------------")
+    print()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=("ARENA MQTT broker benchmarking"))
@@ -239,11 +253,11 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--broker", type=str, help="Broker to connect to",
                         default="oz.andrew.cmu.edu")
     parser.add_argument("-p", "--port", type=int, help="Port to connect to",
-                        default=9001)
+                        default=1883)
     parser.add_argument("-n", "--name", type=str, help="Optional name for saved plot",
                         default="benchmark")
     parser.add_argument("-t", "--timeout", type=float, help="Amount of mins to wait before ending data collection",
-                        default=3.0) # default is 3 mins
+                        default=2.0) # default is 2 mins
     args = parser.parse_args()
 
     main(**vars(args))
