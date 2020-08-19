@@ -203,17 +203,18 @@ document.addEventListener('DOMContentLoaded', function() {
     function onMessageArrived(message) {
         var newJSON = JSON.parse(message.payloadString);
         try {
-            if (newJSON != undefined && newJSON.length > 0) {
+            let cyJSON = createCyJSON(newJSON);
+            if (cyJSON.length > 0) {
                 if (!paused) {
-                    updateCy(newJSON);
+                    updateCy(cyJSON);
                 }
-                prevJSON.push(newJSON);
+                prevJSON.push(cyJSON);
                 currIdx = prevJSON.length;
             }
             spinner.style.display = "none";
             uptodate.style.display = "block";
-            spinnerUpdate = false;
             if (!paused) {
+                spinnerUpdate = false;
                 setTimeout(() => {
                     spinner.style.display = "block";
                     uptodate.style.display = "none";
@@ -258,7 +259,7 @@ document.addEventListener('DOMContentLoaded', function() {
         currIdx++;
         if (currIdx >= prevJSON.length) {
             currIdx = prevJSON.length-1;
-            paused=false;
+            paused = false;
         }
         if (prevIdx != currIdx) {
             updateCy(prevJSON[currIdx]);

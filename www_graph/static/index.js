@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const graphTopic = "$GRAPH";
 
     let prevJSON = [];
-    let paused = false;
+    let currIdx = 0;
 
     let action = null;
 
@@ -89,7 +89,11 @@ document.addEventListener('DOMContentLoaded', function() {
     let span = document.querySelector(".close");
 
     let spinner = document.querySelector(".refreshSpinner");
-    let uptodate = document.getElementById("uptodate")
+    let uptodate = document.getElementById("uptodate");
+
+    let pauseBtn = document.getElementById("pause");
+    let spinnerUpdate = true;
+    let paused = false;
 
     let ipElem = document.getElementById("ipDiv");
     let clientElem = document.getElementById("clientDiv");
@@ -207,24 +211,31 @@ document.addEventListener('DOMContentLoaded', function() {
         return res;
     }
 
+    function updateCy(json) {
+        cy.json({ elements: json });
+        runLayout();
+    }
+
     function onMessageArrived(message) {
         let newJSON = JSON.parse(message.payloadString);
         msgText.value = JSON.stringify(newJSON, undefined, 4);
         try {
             let cyJSON = createCyJSON(newJSON);
-            if (newJSON != undefined && cyJSON.length > 0) {
+            if (cyJSON.length > 0) {
                 if (!paused) {
-                    cy.json({ elements: cyJSON });
-                    runLayout();
+                    updateCy(cyJSON);
                 }
-                prevJSON.push(newJSON);
+                prevJSON.push(cyJSON);
+                currIdx = prevJSON.length;
             }
             spinner.style.display = "none";
             uptodate.style.display = "block";
             if (!paused) {
+                spinnerUpdate = false;
                 setTimeout(() => {
                     spinner.style.display = "block";
                     uptodate.style.display = "none";
+                    spinnerUpdate = true;
                 }, 2000);
             }
         }
@@ -234,15 +245,55 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    cy.on("tap", "node", function(event) {
-        let obj = event.target;
-        let tapped_node = cy.$id(obj.id()).data();
-        console.log(tapped_node["id"]);
+    function timer() {
+        if (spinnerUpdate) {
+            if (paused) {
+                pauseBtn.innerHTML = "&#9658;";
+                spinner.style.display = "none";
+                uptodate.style.display = "block";
+            }
+            else {
+                pauseBtn.innerHTML = "&#10074;&#10074;";
+                spinner.style.display = "block";
+                uptodate.style.display = "none";
+            }
+        }
+        requestAnimationFrame(timer);
+    }
+    timer();
+
+    pauseBtn.addEventListener("click", function() {
+        paused = !paused;
+        if (currIdx != prevJSON.length-1) {
+            currIdx = prevJSON.length-1;
+            updateCy(prevJSON[currIdx]);
+        }
     });
 
-    // cy.on('tap', function(event) {
-    //     var obj = event.target;
-    // });
+    document.getElementById("forward").addEventListener("click", function() {
+        paused = true;
+        let prevIdx = currIdx;
+        currIdx++;
+        if (currIdx >= prevJSON.length) {
+            currIdx = prevJSON.length-1;
+            paused = false;
+        }
+        if (prevIdx != currIdx) {
+            updateCy(prevJSON[currIdx]);
+        }
+    });
+
+    document.getElementById("reverse").addEventListener("click", function() {
+        paused = true;
+        let prevIdx = currIdx;
+        currIdx--;
+        if (currIdx < 0) {
+            currIdx = 0;
+        }
+        if (prevIdx != currIdx) {
+            updateCy(prevJSON[currIdx]);
+        }
+    });
 
     function undisplayModal() {
         modal.style.display = "none";
@@ -290,20 +341,6 @@ document.addEventListener('DOMContentLoaded', function() {
     span.onclick = function() {
         undisplayModal()
     }
-
-    document.getElementById("pause").addEventListener("click", function() {
-        paused = !paused;
-        if (paused) {
-            this.innerText = "Unpause";
-            spinner.style.display = "none";
-            uptodate.style.display = "block";
-        }
-        else {
-            this.innerText = "Pause";
-            spinner.style.display = "block";
-            uptodate.style.display = "none";
-        }
-    });
 
     document.getElementById("connect").addEventListener("click", function() {
         action = "Connect";
@@ -405,4 +442,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 break;
         }
     }
+
+    cy.on("tap", "node", function(event) {
+        let obj = event.target;
+        let tapped_node = cy.$id(obj.id()).data();
+        console.log(tapped_node["id"]);
+    });
+
+    // cy.on('tap', function(event) {
+    //     var obj = event.target;
+    // });
 });

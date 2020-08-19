@@ -117,12 +117,14 @@ static struct ip_container *create_ip_container(const char *ip) {
 
     ip_cont->client_dict = (struct client_dict *)graph__malloc(sizeof(struct client_dict));
     if (!ip_cont->client_dict) {
+        graph__free(ip_cont->address);
         graph__free(ip_cont);
         return NULL;
     }
 
     ip_cont->client_dict->client_list = (struct client **)graph__calloc(1, sizeof(struct client *));
     if (!ip_cont->client_dict->client_list) {
+        graph__free(ip_cont->address);
         graph__free(ip_cont->client_dict);
         graph__free(ip_cont);
         return NULL;

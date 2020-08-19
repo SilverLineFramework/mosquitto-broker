@@ -25,8 +25,11 @@
 
     <body>
         <h2 style="color:white;">MQTT Network Demo</h2>
-        <label id="uptodate" style="display:none;color:white;">Graph is up to date!</label>
-        <div class="refreshSpinner">
+        <button id="reverse" class="timeButton">&#171;</button>
+        <button id="pause" class="timeButton">&#10074;&#10074;</button>
+        <button id="forward" class="timeButton">&#187;</button>
+        <label id="uptodate" class="info" style="display:none;color:white;">Graph is up to date!</label>
+        <div class="refreshSpinner info">
             <label>Fetching graph...</label>
             <div class="rect1"></div>
             <div class="rect2"></div>
@@ -36,7 +39,6 @@
         <div id="container">
             <div id="cy"></div>
             <div class="console">
-                <button id="pause">Pause</button>
                 <button id="connect">Connect</button>
                 <button id="pub">Pub</button>
                 <button id="sub">Sub</button>
