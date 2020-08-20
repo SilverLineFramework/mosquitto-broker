@@ -32,18 +32,19 @@ body {
 }
 
 .info {
-    margin: 12px;
+    margin: 20px;
     height: 50px;
+    text-align: center;
+    color: white;
+    position: fixed;
 }
 
-.refreshSpinner {
-    text-align: center;
-    position: fixed;
+#uptodate {
+    display:none;
 }
 
 .refreshSpinner label {
     display: block;
-    color: white;
 }
 
 .refreshSpinner > div {

@@ -17,20 +17,6 @@ body {
     overflow: hidden;
 }
 
-.timeButton {
-    margin: 5px;
-    width: 40px;
-    height: 40px;
-    padding: 5px 5px 5px 5px;
-    text-decoration: none;
-    font-size: 15px;
-    background-color: #bbbbbb;
-    text-align: center;
-    display: inline-block;
-    outline: none;
-    border-radius: 10px;
-}
-
 .console {
     height: 5%;
     width: 100%;
@@ -130,19 +116,38 @@ input[type=text], select {
     background-color: #45a049;
 }
 
-.info {
-    margin: 12px;
-    height: 50px;
+.timeButton {
+    margin: 5px;
+    width: 40px;
+    height: 40px;
+    padding: 5px 5px 5px 5px;
+    text-decoration: none;
+    font-size: 15px;
+    background-color: #bbbbbb;
+    text-align: center;
+    display: inline-block;
+    outline: none;
+    border-radius: 10px;
 }
 
-.refreshSpinner {
+.info {
+    margin: 20px;
+    height: 50px;
     text-align: center;
+    color: white;
     position: fixed;
+}
+
+#uptodate {
+    display:none;
 }
 
 .refreshSpinner label {
     display: block;
-    color: white;
+}
+
+.refreshSpinner label {
+    display: block;
 }
 
 .refreshSpinner > div {

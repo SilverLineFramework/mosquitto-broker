@@ -196,35 +196,33 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     function updateCy(json) {
-        cy.json({ elements: json });
-        runLayout();
+        try {
+            let cyJSON = createCyJSON(json);
+            cy.json({ elements: cyJSON });
+            runLayout();
+        }
+        catch (err) {
+            console.log(err.message);
+            console.log(JSON.stringify(json, undefined, 2));
+        }
     }
 
     function onMessageArrived(message) {
         var newJSON = JSON.parse(message.payloadString);
-        try {
-            let cyJSON = createCyJSON(newJSON);
-            if (cyJSON.length > 0) {
-                if (!paused) {
-                    updateCy(cyJSON);
-                }
-                prevJSON.push(cyJSON);
-                currIdx = prevJSON.length;
-            }
-            spinner.style.display = "none";
-            uptodate.style.display = "block";
-            if (!paused) {
-                spinnerUpdate = false;
-                setTimeout(() => {
-                    spinner.style.display = "block";
-                    uptodate.style.display = "none";
-                    spinnerUpdate = true;
-                }, 2000);
-            }
-        }
-        catch (err) {
-            console.log(err.message);
-            console.log(JSON.stringify(newJSON, undefined, 4));
+
+        if (!paused) updateCy(newJSON);
+        prevJSON.push(newJSON);
+        if (!paused) currIdx = prevJSON.length;
+
+        spinner.style.display = "none";
+        uptodate.style.display = "block";
+        if (!paused) {
+            spinnerUpdate = false;
+            setTimeout(() => {
+                spinner.style.display = "block";
+                uptodate.style.display = "none";
+                spinnerUpdate = true;
+            }, 2000);
         }
     }
 

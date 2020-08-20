@@ -11,8 +11,8 @@ def plot_data(name, bound, data):
     bound = len(data["avg_lats"]) if bound < 0 else bound // interval
 
     avg_lats = data["avg_lats"][:bound]
-    mbps_sent = data["bpms_sent"][:bound] * 1e-6 # turn to Mb/s
-    mbps_recvd = data["bpms_recvd"][:bound] * 1e-6 # turn to Mb/s
+    mbps_sent = data["bps_sent"][:bound] * 1e-6 # turn to Mb/s
+    mbps_recvd = data["bps_recvd"][:bound] * 1e-6 # turn to Mb/s
     dropped_clients = data["dropped_clients"][:bound]
     dropped_packets_percent = data["dropped_packets_percent"][:bound] * 100
     cpu = data["cpu"][:bound] * 100
@@ -68,7 +68,7 @@ def plot_data(name, bound, data):
     plt.grid(None)
 
     plt.tight_layout()
-    plt.savefig(f"plots/{name}_bandwidth+packet_loss.png")
+    plt.savefig(f"plots/{name}_throughput+packet_loss.png")
 
     # plot cpu and memory usage
     plt.figure()

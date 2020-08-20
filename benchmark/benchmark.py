@@ -136,10 +136,10 @@ class Benchmark(object):
                 print("Timeout reached, exiting...")
                 break
 
-            if len(self.avg_lats) > 100 and rmsd(self.avg_lats[-100:]) < 0.00005:
-                self.killer.kill_now.value = 1
-                print("RMSD threshold crossed, exiting...")
-                break
+            # if len(self.avg_lats) > 100 and rmsd(self.avg_lats[-100:]) < 0.00005:
+            #     self.killer.kill_now.value = 1
+            #     print("RMSD threshold crossed, exiting...")
+            #     break
 
             if self.killer.kill_now.value:
                 if input("End Benchmark [y/n]? ") == "y":
