@@ -27,11 +27,11 @@ class GracefulKiller:
         self.kill_now.value = 1
 
 class Benchmark(object):
-    def __init__(self, name, num_cams, timeout, broker, port, scene):
+    def __init__(self, name, num_cams, timeout, brokers, ports, scene):
         self.name = name
         self.num_cams = num_cams
-        self.broker = broker
-        self.port = port
+        self.brokers = [broker for broker in brokers if broker is not None]
+        self.ports = [ports[i] for i in range(len(brokers)) if brokers[i] is not None]
         self.scene = scene
         self.timeout = timeout
 
@@ -65,7 +65,8 @@ class Benchmark(object):
         self.client.on_message = self.on_message
 
     def on_connect(self, client, userdata, flags, rc):
-        client.subscribe("cpu_mem")
+        for i in range(len(self.brokers)):
+            client.subscribe(f"cpu_mem{i if i != 0 else ''}")
 
     def on_message(self, client, userdata, message):
         msg = json.loads(message.payload.decode())
@@ -77,7 +78,7 @@ class Benchmark(object):
         self.client.connect("oz.andrew.cmu.edu", 1883)
         self.client.loop_start()
 
-        ps = [Process(target=self.move_cam, args=()) for _ in range(self.num_cams)]
+        ps = [Process(target=self.move_cam, args=(i,)) for i in range(self.num_cams)]
         for p in ps:
             p.daemon = True
             p.start()
@@ -95,7 +96,7 @@ class Benchmark(object):
         self.client.loop_stop()
         self.client.disconnect()
 
-        print("waiting for processes to finish")
+        # print("waiting for processes to finish")
         for p in ps: p.join()
 
         while self.dropped_clients_queue.qsize() > 0:
@@ -148,14 +149,14 @@ class Benchmark(object):
 
             time.sleep(0.001)
 
-    def create_cam(self):
+    def create_cam(self, i):
         cam = Camera(f"cam{rand_num(5)}", self.scene, rand_color())
-        cam.connect(self.broker, self.port)
+        cam.connect(self.brokers[i%len(self.brokers)], self.ports[i%len(self.ports)])
         return cam
 
-    def move_cam(self):
+    def move_cam(self, i):
         try:
-            cam = self.create_cam()
+            cam = self.create_cam(i)
         except:
             self.drop_lock.acquire()
             self.dropped_clients_queue.put(1)
@@ -184,9 +185,7 @@ class Benchmark(object):
 
             time.sleep(0.001)
 
-        # print(len(cam.client._out_packet), len(cam.client._in_packet))
         cam.disconnect()
-        # print("here")
 
         self.queues_lock.acquire()
         self.bytes_sent_queue.put(cam.get_bytes_sent())
@@ -219,11 +218,11 @@ class Benchmark(object):
     def save(self):
         np.savez(f"data/client_{self.name}", times=np.array(self.times), avg_lats=np.array(self.avg_lats))
 
-def main(num_cams, timeout, broker, port, name):
+def main(num_cams, timeout, broker, port, broker2, port2, name):
     print()
     print(f"----- Running benchmark with {num_cams} clients -----")
 
-    test = Benchmark(f"{name}_c{num_cams}", num_cams, timeout*60, broker, port, "benchmark_"+rand_str(5))
+    test = Benchmark(f"{name}_c{num_cams}", num_cams, timeout*60, (broker, broker2), (port, port2), "benchmark_"+rand_str(5))
     test.run()
 
     avg_lats = np.mean(test.get_avg_lats())
@@ -235,7 +234,10 @@ def main(num_cams, timeout, broker, port, name):
     mem = np.mean(test.get_mem())
 
     print("----- Summary -----")
-    print(f"{num_cams} Clients connecting to {broker}:{port} with {timeout} sec timeout:")
+    if not broker2:
+        print(f"{num_cams} Clients connecting to {broker}:{port} with {timeout} sec timeout:")
+    else:
+        print(f"{num_cams} Clients connecting to {broker}:{port} and {broker2}:{port2} with {timeout} sec timeout:")
     print(f"  {np.mean(avg_lats)} ms response time")
     print(f"  {bps_sent} bytes/ms sent | {bps_recvd} bytes/ms received")
     print(f"  {dropped_clients} clients dropped | {dropped_packets_percent*100}% packet loss")
@@ -248,16 +250,22 @@ def main(num_cams, timeout, broker, port, name):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=("ARENA MQTT broker benchmarking"))
+
     parser.add_argument("-c", "--num_cams", type=int, help="Number of clients to spawn",
                         default=1)
     parser.add_argument("-b", "--broker", type=str, help="Broker to connect to",
                         default="oz.andrew.cmu.edu")
     parser.add_argument("-p", "--port", type=int, help="Port to connect to",
                         default=1883)
+    parser.add_argument("-b2", "--broker2", type=str, help="Second broker to connect to. For broker-broker",
+                        default=None)
+    parser.add_argument("-p2", "--port2", type=int, help="Second port to connect to. For broker-broker",
+                        default=7883)
     parser.add_argument("-n", "--name", type=str, help="Optional name for saved plot",
                         default="benchmark")
     parser.add_argument("-t", "--timeout", type=float, help="Amount of mins to wait before ending data collection",
                         default=2.0) # default is 2 mins
+
     args = parser.parse_args()
 
     main(**vars(args))

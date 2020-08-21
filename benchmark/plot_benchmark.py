@@ -39,6 +39,7 @@ def plot_data(name, bound, data):
     ax2 = ax1.twinx()
     ax2.set_xlabel("Number of Clients")
     ax2.set_ylabel("Avg Latency (ms)")
+    ax2.set_ylim(0, 30000)
     ax2.errorbar(clients, avg_lats, yerr=std_lats, fmt="--b.", solid_capstyle="projecting", capsize=5, label="Avg Latency")
     ax2.grid(None)
 
@@ -51,12 +52,14 @@ def plot_data(name, bound, data):
     plt.subplot(3, 1, 1)
     plt.title("Sent to Broker")
     plt.ylabel("MBytes/s")
+    plt.ylim(0, 1.75)
     plt.plot(clients, mbps_sent, "--.", label="sent", color="orange")
     plt.grid(None)
 
     plt.subplot(3, 1, 2)
     plt.title("Received from Broker")
     plt.ylabel("MBytes/s")
+    plt.ylim(0, 175)
     plt.plot(clients, mbps_recvd, "--b.", label="received")
     plt.grid(None)
 
@@ -64,6 +67,7 @@ def plot_data(name, bound, data):
     plt.title("% Packet Loss")
     plt.xlabel("Number of Clients")
     plt.ylabel("% Packet Loss")
+    plt.ylim(0, 100)
     plt.plot(clients, dropped_packets_percent, "--g.")
     plt.grid(None)
 

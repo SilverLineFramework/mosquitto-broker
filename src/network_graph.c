@@ -22,7 +22,7 @@
 
 /*****************************************************************************/
 
-static struct network_graph *graph = NULL;
+static struct network_graph *graph = NULL;      /**< global graph structure */
 static cJSON_Hooks *hooks = NULL;
 
 static int ttl_cnt = 0;
@@ -994,14 +994,13 @@ int network_graph_delete_client(struct mosquitto *context) {
     return 0;
 }
 
-cJSON *graph_json_create() {
+static cJSON *graph_json_create() {
     /*
     {
         "ips": [],
         "topics": []
     }
     */
-
     cJSON *root, *ips, *topics;
     root = cJSON_CreateObject();
     ips = cJSON_CreateArray();
@@ -1011,14 +1010,13 @@ cJSON *graph_json_create() {
     return root;
 }
 
-cJSON *graph_json_add_ip(cJSON *root, struct ip_container *ip) {
+static cJSON *graph_json_add_ip(cJSON *root, struct ip_container *ip) {
     /*
     {
         "address": "127.0.0.1",
         "clients": []
     }
     */
-
     cJSON *ip_json, *ips;
     ips = cJSON_GetObjectItem(root, "ips");
     ip_json = cJSON_CreateObject();
@@ -1028,7 +1026,7 @@ cJSON *graph_json_add_ip(cJSON *root, struct ip_container *ip) {
     return ip_json;
 }
 
-cJSON *ip_json_add_client(cJSON *ip_json, struct client *client) {
+static cJSON *ip_json_add_client(cJSON *ip_json, struct client *client) {
     /*
     {
         "name": "client1",
@@ -1036,7 +1034,6 @@ cJSON *ip_json_add_client(cJSON *ip_json, struct client *client) {
         "published": []
     }
     */
-
     cJSON *client_json, *clients;
     clients = cJSON_GetObjectItem(ip_json, "clients");
     client_json = cJSON_CreateObject();
@@ -1047,14 +1044,13 @@ cJSON *ip_json_add_client(cJSON *ip_json, struct client *client) {
     return client_json;
 }
 
-void client_json_add_pub(cJSON *client, struct pub_edge *pub_edge) {
+static void client_json_add_pub(cJSON *client, struct pub_edge *pub_edge) {
     /*
         {
             "topic": "topic1/sub_topic1",
             "bps": 9000
         }
     */
-
     cJSON *topic_json, *topics;
     topics = cJSON_GetObjectItem(client, "published");
     topic_json = cJSON_CreateObject();
@@ -1063,14 +1059,13 @@ void client_json_add_pub(cJSON *client, struct pub_edge *pub_edge) {
     cJSON_AddItemToArray(topics, topic_json);
 }
 
-cJSON *graph_json_add_topic(cJSON *root, struct topic *topic) {
+static cJSON *graph_json_add_topic(cJSON *root, struct topic *topic) {
     /*
     {
         "name": "topic1/sub_topic1",
         "subscriptions": []
     }
     */
-
     cJSON *topic_json, *topics;
     topics = cJSON_GetObjectItem(root, "topics");
     topic_json = cJSON_CreateObject();
@@ -1080,7 +1075,7 @@ cJSON *graph_json_add_topic(cJSON *root, struct topic *topic) {
     return topic_json;
 }
 
-void topic_json_add_sub(cJSON *topic, struct sub_edge *sub_edge, double bytes_per_sec) {
+static void topic_json_add_sub(cJSON *topic, struct sub_edge *sub_edge, double bytes_per_sec) {
     /*
     {
         "client": "client1",
@@ -1111,7 +1106,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
     struct ip_container *ip_cont;
     struct client *client;
     struct sub_edge *sub_edge;
-    struct pub_edge *pub_edge, *pub_edge_curr;
+    struct pub_edge *pub_edge, *curr_pub_edge;
     struct topic *topic, *temp;
 
     double temp_bytes;
@@ -1134,19 +1129,19 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
 
                         pub_edge = client->pub_list;
                         while (pub_edge != NULL) { // client may have published topics
-                            pub_edge_curr = pub_edge;
+                            curr_pub_edge = pub_edge;
                             pub_edge = pub_edge->next;
 
-                            temp_bytes = (double)pub_edge_curr->bytes / (now - last_update);
-                            pub_edge_curr->bytes = 0;
-                            pub_edge_curr->bytes_per_sec = round3(temp_bytes);
+                            temp_bytes = (double)curr_pub_edge->bytes / (now - last_update);
+                            curr_pub_edge->bytes = 0;
+                            curr_pub_edge->bytes_per_sec = round3(temp_bytes);
 
-                            if (pub_edge_curr->bytes_per_sec == 0.0 && --pub_edge_curr->ttl_cnt <= 0) {
-                                graph_delete_pub(client, pub_edge_curr);
+                            if (curr_pub_edge->bytes_per_sec == 0.0 && --curr_pub_edge->ttl_cnt <= 0) {
+                                graph_delete_pub(client, curr_pub_edge);
                                 graph->changed = true;
                             }
                             else {
-                                client_json_add_pub(client_json, pub_edge_curr);
+                                client_json_add_pub(client_json, curr_pub_edge);
                             }
                         }
                     }

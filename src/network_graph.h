@@ -56,16 +56,16 @@ struct topic
  */
 struct client
 {
-    char *name;
     bool latency_ready;
     uint16_t latency_cnt;               /**< num times latency has been recved */
     double latency_avg_ms;
     struct client *next;
     struct client *prev;
     struct pub_edge *pub_list;          /**< current topics client is pubbing to */
+    char *name;
     time_t latency;                     /**< response time in ns */
     time_t latency_total;               /**< total response time in ns */
-    unsigned long hash;                 /**< hash(client_id) */
+    unsigned long hash;                 /**< hash(name) */
 };
 
 /**
@@ -86,8 +86,8 @@ struct ip_container
  */
 struct ip_dict
 {
-    size_t used;
-    size_t max_size;
+    size_t used;                        /**< current number of slots used */
+    size_t max_size;                    /**< maximum number of slots */
     struct ip_container **ip_list;      /**< list of all ip addresses */
 };
 
@@ -95,8 +95,8 @@ struct ip_dict
  * @brief Topic Dictionary structure. Holds a hash table of topic node structures.
  */
 struct topic_dict {
-    size_t used;
-    size_t max_size;
+    size_t used;                        /**< current number of slots used */
+    size_t max_size;                    /**< maximum number of slots */
     struct topic **topic_list;          /**< list of all topics */
 };
 
@@ -105,8 +105,8 @@ struct topic_dict {
  */
 struct client_dict
 {
-    size_t used;
-    size_t max_size;
+    size_t used;                        /**< current number of slots used */
+    size_t max_size;                    /**< maximum number of slots */
     struct client **client_list;        /**< list of all clients connect with ip */
 };
 
