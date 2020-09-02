@@ -1067,7 +1067,7 @@ static void client_json_add_pub(cJSON *client, struct pub_edge *pub_edge) {
     topics = cJSON_GetObjectItem(client, "published");
     topic_json = cJSON_CreateObject();
     cJSON_AddStringToObject(topic_json, "topic", pub_edge->pub->name);
-    cJSON_AddNumberToObject(topic_json, "bps", pub_edge->pub->bytes_per_sec);
+    cJSON_AddNumberToObject(topic_json, "bps", pub_edge->bytes_per_sec);
     cJSON_AddItemToArray(topics, topic_json);
 }
 
