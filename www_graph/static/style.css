@@ -40,6 +40,7 @@ body {
     display: inline-block;
     outline: none;
     border-radius: 5px;
+    border: 0;
 }
 
 .modal {
@@ -128,6 +129,12 @@ input[type=text], select {
     display: inline-block;
     outline: none;
     border-radius: 10px;
+    cursor: pointer;
+}
+
+.timeButton:active,
+.timeButton:hover {
+  background-color: #999999;
 }
 
 .info {

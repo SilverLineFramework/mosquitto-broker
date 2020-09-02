@@ -74,7 +74,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const brokerAddr = "wss://oz.andrew.cmu.edu/mqtt/";
     const client = new Paho.MQTT.Client(brokerAddr, "graphViewer-" + (+new Date).toString(36));
-    const graphTopic = "$GRAPH";
+    const graphTopic = "$NETWORK";
 
     let prevJSON = [];
     let currIdx = 0;
@@ -94,9 +94,9 @@ document.addEventListener('DOMContentLoaded', function() {
     function onConnect() {
         console.log("Connected!");
         client.subscribe(graphTopic);
-        publish(client, "$GRAPH/latency", "", 2);
+        publish(client, "$NETWORK/latency", "", 2);
         setInterval(() => {
-            publish(client, "$GRAPH/latency", "", 2);
+            publish(client, "$NETWORK/latency", "", 2);
         }, 10000);
     }
 

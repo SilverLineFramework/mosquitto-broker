@@ -57,7 +57,7 @@ WITH_MEMORY_TRACKING:=yes
 # information about the broker state.
 WITH_SYS_TREE:=yes
 
-# Comment out to remove publishing of the $GRAPH topic hierarchy containing
+# Comment out to remove publishing of the $NETWORK topic hierarchy containing
 # information about the network topology.
 WITH_GRAPH:=yes
 

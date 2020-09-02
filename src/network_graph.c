@@ -760,7 +760,7 @@ int network_graph_add_client(struct mosquitto *context) {
  * Called after client publishes to topic
  */
 int network_graph_add_topic(struct mosquitto *context, uint8_t retain, const char *topic, uint32_t payloadlen) {
-    if (topic[0] == '$') return 0; // ignore $SYS/#, $GRAPH/# topics
+    if (topic[0] == '$') return 0; // ignore $SYS/#, $NETWORK/# topics
     char *address, *id;
     struct ip_container *ip_cont;
     struct client *client;
@@ -817,7 +817,7 @@ int network_graph_add_topic(struct mosquitto *context, uint8_t retain, const cha
  * Called after client subscribes to topic
  */
 int network_graph_add_sub_edge(struct mosquitto *context, const char *topic) {
-    if (topic[0] == '$') return 0; // ignore $SYS or $GRAPH topics
+    if (topic[0] == '$') return 0; // ignore $SYS or $NETWORK topics
     bool match;
     char *address, *id;
     struct ip_container *ip_cont;
@@ -893,8 +893,8 @@ int network_graph_delete_sub_edge(struct mosquitto *context, const char *topic) 
  * Called after sending PUBREL
  */
 int network_graph_latency_start(struct mosquitto *context, const char *topic) {
-    // do not update latency if topic is not $GRAPH/latency
-    if (strncmp(topic, "$GRAPH/latency", 15) != 0) return 0;
+    // do not update latency if topic is not $NETWORK/latency
+    if (strncmp(topic, "$NETWORK/latency", 15) != 0) return 0;
 
     char *address, *id;
     struct ip_container *ip_cont;
@@ -994,6 +994,9 @@ int network_graph_delete_client(struct mosquitto *context) {
     return 0;
 }
 
+/*
+ * Created empty graph JSON
+ */
 static cJSON *graph_json_create() {
     /*
     {
@@ -1010,6 +1013,9 @@ static cJSON *graph_json_create() {
     return root;
 }
 
+/*
+ * Adds an ip address to JSON
+ */
 static cJSON *graph_json_add_ip(cJSON *root, struct ip_container *ip) {
     /*
     {
@@ -1026,6 +1032,9 @@ static cJSON *graph_json_add_ip(cJSON *root, struct ip_container *ip) {
     return ip_json;
 }
 
+/*
+ * Adds a client to JSON
+ */
 static cJSON *ip_json_add_client(cJSON *ip_json, struct client *client) {
     /*
     {
@@ -1044,6 +1053,9 @@ static cJSON *ip_json_add_client(cJSON *ip_json, struct client *client) {
     return client_json;
 }
 
+/*
+ * Adds a publisher edge to JSON
+ */
 static void client_json_add_pub(cJSON *client, struct pub_edge *pub_edge) {
     /*
         {
@@ -1059,6 +1071,9 @@ static void client_json_add_pub(cJSON *client, struct pub_edge *pub_edge) {
     cJSON_AddItemToArray(topics, topic_json);
 }
 
+/*
+ * Adds a subscription edge to JSON
+ */
 static cJSON *graph_json_add_topic(cJSON *root, struct topic *topic) {
     /*
     {
@@ -1075,6 +1090,9 @@ static cJSON *graph_json_add_topic(cJSON *root, struct topic *topic) {
     return topic_json;
 }
 
+/*
+ * Adds an ip address to JSON
+ */
 static void topic_json_add_sub(cJSON *topic, struct sub_edge *sub_edge, double bytes_per_sec) {
     /*
     {
@@ -1182,10 +1200,10 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
             graph_set_topic_dict_size(graph->topic_dict->max_size / 2);
         }
 
-        // publish the updated graph to $GRAPH topic
+        // publish the updated graph to $NETWORK topic
         json_buf = cJSON_PrintUnformatted(root);
         if (json_buf != NULL && graph->changed) {
-            db__messages_easy_queue(db, NULL, "$GRAPH", GRAPH_QOS, strlen(json_buf), json_buf, 1, 0, NULL);
+            db__messages_easy_queue(db, NULL, "$NETWORK", GRAPH_QOS, strlen(json_buf), json_buf, 1, 0, NULL);
             graph->changed = false;
         }
         cJSON_free(json_buf);
@@ -1195,14 +1213,14 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
         if (current_heap != memcount) {
             current_heap = memcount;
             snprintf(heap_buf, BUFLEN, "%lu", current_heap);
-            db__messages_easy_queue(db, NULL, "$GRAPH/heap/current", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
+            db__messages_easy_queue(db, NULL, "$NETWORK/heap/current", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
         }
 
         // update current graph maximum memory usage topic
         if (max_heap != memcount) {
             max_heap = max_memcount;
             snprintf(heap_buf, BUFLEN, "%lu", max_heap);
-            db__messages_easy_queue(db, NULL, "$GRAPH/heap/maximum", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
+            db__messages_easy_queue(db, NULL, "$NETWORK/heap/maximum", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
         }
 
         last_update = mosquitto_time();

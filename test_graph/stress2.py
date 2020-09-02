@@ -24,7 +24,7 @@ while False == False:
         new_client.loop_start()
 
         clients += [new_client]
-        new_client.publish("$GRAPH/latency", None, qos=2, retain=False)
+        new_client.publish("$NETWORK/latency", None, qos=2, retain=False)
 
     elif len(clients) >= 10 and num <= 5: # disconnect
         client = random.choice(clients)
