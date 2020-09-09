@@ -72,14 +72,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }]
     });
 
-    // read defaults from file
-    var data = await fetch("dft-config.json");
-    var dfts = await data.json();
-
-    const brokerAddr = dfts.brokerAddr;
-    const client = new Paho.MQTT.Client(brokerAddr, "graphViewer-" + (+new Date).toString(36));
-    const graphTopic = dfts.graphTopic;
-
     let prevJSON = [];
     let currIdx = 0;
 
@@ -90,17 +82,29 @@ document.addEventListener('DOMContentLoaded', function() {
     let spinnerUpdate = true;
     let paused = false;
 
-    client.onConnectionLost = onConnectionLost;
-    client.onMessageArrived = onMessageArrived;
+    // read defaults from file
+    fetch("./dft-config.json")
+    .then(function (data) {
+        return data.json();
+    })
+    .then(function (json) {
+        var dfts = json;
+        const brokerAddr = dfts.brokerAddr;
+        window.client = new Paho.MQTT.Client(brokerAddr, "graphViewer-" + (+new Date).toString(36));
+        window.graphTopic = dfts.graphTopic;
 
-    client.connect({ onSuccess: onConnect });
+        window.client.onConnectionLost = onConnectionLost;
+        window.client.onMessageArrived = onMessageArrived;
+
+        window.client.connect({ onSuccess: onConnect });
+    });
 
     function onConnect() {
         console.log("Connected!");
-        client.subscribe(graphTopic);
-        publish(client, graphTopic + "/latency", "", 2);
+        window.client.subscribe(graphTopic);
+        publish(window.client, window.graphTopic + "/latency", "", 2);
         setInterval(() => {
-            publish(client, graphTopic + "/latency", "", 2);
+            publish(window.client, window.graphTopic + "/latency", "", 2);
         }, 10000);
     }
 
