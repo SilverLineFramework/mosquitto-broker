@@ -33,6 +33,9 @@ WORKDIR /build/mosq
 
 COPY . .
 
+RUN mkdir -p /mosquitto/www && \
+    cp -r /build/mosq/www_graph/html/ /mosquitto/www/ 
+
 RUN rm -rf build || true && \
     mkdir build && \
     cd build && \
