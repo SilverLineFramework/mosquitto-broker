@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         spinner.style.display = "none";
         uptodate.style.display = "block";
-        uptodate.innerText = "Connecton lost. Refresh to try again.";
+        uptodate.innerText = "Connection lost. Refresh to try again.";
         // clientMain.connect({ onSuccess: onConnect });
     }
 
