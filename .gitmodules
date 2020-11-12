@@ -4,3 +4,6 @@
 [submodule "src/cJSON"]
 	path = src/cJSON
 	url = https://github.com/DaveGamble/cJSON.git
+[submodule "jwt-auth"]
+	path = jwt-auth
+	url = https://github.com/wiomoc/mosquitto-jwt-auth
