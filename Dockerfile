@@ -1,14 +1,26 @@
-FROM alpine:3.12
+FROM ubuntu:latest
 
 ENV LWS_VERSION=2.4.2
 
-RUN set -x && \
-    apk --no-cache add --virtual build-deps \
-        build-base \
+## Make apt noninteractive
+ENV DEBIAN_FRONTEND noninteractive
+ENV DEBCONF_NONINTERACTIVE_SEEN true
+
+## Preesed tzdata, update package index, upgrade packages and install needed software
+RUN truncate -s0 /tmp/preseed.cfg; \
+    echo "tzdata tzdata/Areas select Europe" >> /tmp/preseed.cfg; \
+    echo "tzdata tzdata/Zones/Europe select Berlin" >> /tmp/preseed.cfg; \
+    debconf-set-selections /tmp/preseed.cfg && \
+    rm -f /etc/timezone /etc/localtime && \
+    apt-get update && \
+    apt-get install -y build-essential \
         cmake \
         gnupg \
-        openssl-dev \
-        util-linux-dev && \
+        libssl-dev \
+        wget \
+        curl \
+        ca-certificates \
+        vim && \
     wget https://github.com/warmcat/libwebsockets/archive/v${LWS_VERSION}.tar.gz -O /tmp/lws.tar.gz && \
     mkdir -p /build/lws && \
     tar --strip=1 -xf /tmp/lws.tar.gz -C /build/lws && \
@@ -28,10 +40,18 @@ RUN set -x && \
     make -j "$(nproc)" && \
     rm -rf /root/.cmake && \
     mkdir -p /build/mosq
-    
+
 WORKDIR /build/mosq
 
 COPY . .
+
+# Build /usr/lib/libmosquitto_jwt_auth.so 
+ENV PATH="/root/.cargo/bin:${PATH}"
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y && \
+    cd /build/mosq/jwt-auth && \ 
+    cargo build --release && \
+    mkdir -p /mosquitto/jwt-auth && \
+    install -s -m644 target/release/libmosquitto_jwt_auth.so /usr/lib/libmosquitto_jwt_auth.so 
 
 RUN mkdir -p /mosquitto/www && \
     cp -r /build/mosq/www_graph/html/ /mosquitto/www/ 
@@ -46,8 +66,8 @@ RUN rm -rf build || true && \
     mkdir bin && \
     mv build/client/mosquitto* bin/ && \
     mv build/src/mosquitto* bin/ && \
-    addgroup -S -g 1883 mosquitto 2>/dev/null && \
-    adduser -S -u 1883 -D -H -h /var/empty -s /sbin/nologin -G mosquitto -g mosquitto mosquitto 2>/dev/null && \
+    addgroup mosquitto && \
+    useradd -ms /sbin/nologin -g mosquitto mosquitto && \
     mkdir -p /mosquitto/config /mosquitto/data /mosquitto/log && \
     install -d /usr/sbin/ && \
     install -s -m755 /build/mosq/bin/mosquitto_pub /usr/bin/mosquitto_pub && \
@@ -58,15 +78,12 @@ RUN rm -rf build || true && \
     install -s -m755 /build/mosq/bin/mosquitto_passwd /usr/bin/mosquitto_passwd && \
     install -m644 /build/mosq/conf/mosquitto.conf /mosquitto/config/mosquitto.conf && \
     chown -R mosquitto:mosquitto /mosquitto && \
-    apk --no-cache add \
-        ca-certificates && \
-    apk del build-deps && \
     rm -rf /build
 
 VOLUME ["/mosquitto/data", "/mosquitto/log"]
 
 # Set up the entry point script and default command
-COPY docker/1.6-openssl/docker-entrypoint.sh /
+#COPY docker/1.6-openssl/docker-entrypoint.sh /
 EXPOSE 1883
-ENTRYPOINT ["/docker-entrypoint.sh"]
+#ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["/usr/sbin/mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
