@@ -19,6 +19,7 @@ RUN truncate -s0 /tmp/preseed.cfg; \
         libssl-dev \
         wget \
         curl \
+        netcat \
         ca-certificates \
         vim && \
     wget https://github.com/warmcat/libwebsockets/archive/v${LWS_VERSION}.tar.gz -O /tmp/lws.tar.gz && \
@@ -45,16 +46,16 @@ WORKDIR /build/mosq
 
 COPY . .
 
-# Build /usr/lib/libmosquitto_jwt_auth.so 
+# Build /usr/lib/libmosquitto_jwt_auth.so
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y && \
-    cd /build/mosq/jwt-auth && \ 
+    cd /build/mosq/jwt-auth && \
     cargo build --release && \
     mkdir -p /mosquitto/jwt-auth && \
-    install -s -m644 target/release/libmosquitto_jwt_auth.so /usr/lib/libmosquitto_jwt_auth.so 
+    install -s -m644 target/release/libmosquitto_jwt_auth.so /usr/lib/libmosquitto_jwt_auth.so
 
 RUN mkdir -p /mosquitto/www && \
-    cp -r /build/mosq/www_graph/html/ /mosquitto/www/ 
+    cp -r /build/mosq/www_graph/html/ /mosquitto/www/
 
 RUN rm -rf build || true && \
     mkdir build && \
@@ -79,6 +80,8 @@ RUN rm -rf build || true && \
     install -m644 /build/mosq/conf/mosquitto.conf /mosquitto/config/mosquitto.conf && \
     chown -R mosquitto:mosquitto /mosquitto && \
     rm -rf /build
+
+HEALTHCHECK CMD /usr/bin/nc -vzw 5 localhost 1883
 
 VOLUME ["/mosquitto/data", "/mosquitto/log"]
 
