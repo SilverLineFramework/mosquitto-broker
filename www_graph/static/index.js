@@ -137,15 +137,17 @@ document.addEventListener('DOMContentLoaded', function() {
     function runLayout() {
         cy.layout({
             name: 'fcose',
-            padding: 50,
+            padding: 10,
+            randomize: true,
             fit: true,
             animate: true,
+            packComponents: true,
             nodeRepulsion: 4500,
             idealEdgeLength: 50,
             tile: true,
             tilingPaddingVertical: 10,
             tilingPaddingHorizontal: 10,
-            animationDuration: 100,
+            animationDuration: 300,
             animationEasing: 'ease-out'
         }).run();
     }
@@ -157,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let ip = json["ips"][i]
             let ipJSON = {};
             ipJSON["data"] = {};
-            ipJSON["data"]["id"] = ip["address"];
+            ipJSON["data"]["id"] = ip["id"];
             ipJSON["data"]["class"] = "ip";
             ipJSON["group"] = "nodes";
             res.push(ipJSON);
@@ -169,7 +171,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 clientJSON["data"]["id"] = client["name"];
                 clientJSON["data"]["latency"] = client["latency"];
                 clientJSON["data"]["class"] = "client";
-                clientJSON["data"]["parent"] = ip["address"];
+                clientJSON["data"]["parent"] = ip["id"];
                 clientJSON["group"] = "nodes";
                 res.push(clientJSON);
 

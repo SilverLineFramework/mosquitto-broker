@@ -56,15 +56,12 @@ struct topic
  */
 struct client
 {
-    bool latency_ready;
-    uint16_t latency_cnt;               /**< num times latency has been recved */
-    double latency_avg_ms;
     struct client *next;
     struct client *prev;
     struct pub_edge *pub_list;          /**< current topics client is pubbing to */
     char *name;
-    time_t latency;                     /**< response time in ns */
-    time_t latency_total;               /**< total response time in ns */
+    double latency;                     /**< response time in ns */
+    time_t time_prev;
     unsigned long hash;                 /**< hash(name) */
 };
 
@@ -74,7 +71,7 @@ struct client
  */
 struct ip_container
 {
-    char *address;
+    char *id;
     struct ip_container *next;
     struct ip_container *prev;
     struct client_dict *client_dict;    /**< dict of all clients with specific IP address */
