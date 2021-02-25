@@ -1,6 +1,7 @@
 #include <string.h>
 #include <math.h>
 #include <cJSON/cJSON.h>
+#include <time.h>
 
 #  if defined(__APPLE__)
 #    include <malloc/malloc.h>
@@ -17,8 +18,11 @@
 #include "sys_tree.h"
 #include "network_graph.h"
 
-#define GRAPH_QOS   2
-#define BUFLEN      100
+#define GRAPH_QOS       2
+#define BUFLEN          100
+
+#define ID_STR_LEN      26
+#define ID_CHARS_LEN    62
 
 /*****************************************************************************/
 
@@ -29,6 +33,8 @@ static int ttl_cnt = 0;
 
 static unsigned long memcount = 0;
 static unsigned long max_memcount = 0;
+
+static char id_chars[] = "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 /*****************************************************************************/
 
@@ -48,6 +54,15 @@ static unsigned long sdbm_hash(const char *str) {
     return hash;
 }
 
+static char *create_random_id(void) {
+    char *id = (char *)malloc(ID_STR_LEN * sizeof(char));
+    for (int i = 0; i < ID_STR_LEN-1; i++) {
+        id[i] = id_chars[random() % ID_CHARS_LEN];
+    }
+    id[ID_STR_LEN-1] = '\0';
+    return id;
+}
+
 /*
  * Malloc wrapper for counting graph memory usage
  */
@@ -56,8 +71,8 @@ void *graph__malloc(size_t len) {
     if (mem != NULL) {
         memcount += malloc_usable_size(mem);
         if (memcount > max_memcount){
-			max_memcount = memcount;
-		}
+            max_memcount = memcount;
+        }
     }
     return mem;
 }
@@ -66,12 +81,12 @@ void *graph__malloc(size_t len) {
  * Calloc wrapper for counting graph memory usage
  */
 void *graph__calloc(size_t nmemb, size_t size) {
-	void *mem = calloc(nmemb, size);
+    void *mem = calloc(nmemb, size);
     if (mem != NULL) {
         memcount += malloc_usable_size(mem);
         if (memcount > max_memcount){
-			max_memcount = memcount;
-		}
+            max_memcount = memcount;
+        }
     }
     return mem;
 }
@@ -80,25 +95,25 @@ void *graph__calloc(size_t nmemb, size_t size) {
  * Free wrapper for counting graph memory usage
  */
 void graph__free(void *mem) {
-	if (mem == NULL) {
-		return;
-	}
-	memcount -= malloc_usable_size(mem);
-	free(mem);
+    if (mem == NULL) {
+        return;
+    }
+    memcount -= malloc_usable_size(mem);
+    free(mem);
 }
 
 /*
  * Strdup wrapper for counting graph memory usage
  */
 char *graph__strdup(const char *s) {
-	char *str = strdup(s);
-	if (str != NULL) {
-		memcount += malloc_usable_size(str);
+    char *str = strdup(s);
+    if (str != NULL) {
+        memcount += malloc_usable_size(str);
         if (memcount > max_memcount){
-			max_memcount = memcount;
-		}
-	}
-	return str;
+            max_memcount = memcount;
+        }
+    }
+    return str;
 }
 
 /*****************************************************************************/
@@ -106,25 +121,26 @@ char *graph__strdup(const char *s) {
 /*
  * Creates an ip container struct from a given IP address
  */
-static struct ip_container *create_ip_container(const char *ip) {
+static struct ip_container *create_ip_container(const char *ip_addr) {
     struct ip_container *ip_cont = (struct ip_container *)graph__malloc(sizeof(struct ip_container));
     if (!ip_cont) {
         return NULL;
     }
-    ip_cont->address = graph__strdup(ip);
     ip_cont->next = NULL;
     ip_cont->prev = NULL;
 
+    ip_cont->id = create_random_id();
+
     ip_cont->client_dict = (struct client_dict *)graph__malloc(sizeof(struct client_dict));
     if (!ip_cont->client_dict) {
-        graph__free(ip_cont->address);
+        graph__free(ip_cont->id);
         graph__free(ip_cont);
         return NULL;
     }
 
     ip_cont->client_dict->client_list = (struct client **)graph__calloc(1, sizeof(struct client *));
     if (!ip_cont->client_dict->client_list) {
-        graph__free(ip_cont->address);
+        graph__free(ip_cont->id);
         graph__free(ip_cont->client_dict);
         graph__free(ip_cont);
         return NULL;
@@ -132,7 +148,7 @@ static struct ip_container *create_ip_container(const char *ip) {
     ip_cont->client_dict->max_size = 1;
     ip_cont->client_dict->used = 0;
 
-    ip_cont->hash = sdbm_hash(ip);
+    ip_cont->hash = sdbm_hash(ip_addr);
     return ip_cont;
 }
 
@@ -142,10 +158,8 @@ static struct ip_container *create_ip_container(const char *ip) {
 static struct client *create_client(const char *id, const char *address) {
     struct client *client = (struct client *)graph__malloc(sizeof(struct client));
     if (!client) return NULL;
-    client->latency_ready = false;
-    client->latency_total = 0;
-    client->latency_cnt = 0;
-    client->latency_avg_ms = NAN;
+    client->latency = -1.0;
+    client->time_prev = -1;
     client->name = graph__strdup(id);
     client->pub_list = NULL;
     client->next = NULL;
@@ -593,7 +607,7 @@ static int graph_delete_ip(struct ip_container *ip_cont) {
     if (ip_cont->prev != NULL) {
         ip_cont->prev->next = ip_cont->next;
     }
-    graph__free(ip_cont->address);
+    graph__free(ip_cont->id);
     graph__free(ip_cont->client_dict->client_list);
     graph__free(ip_cont->client_dict);
     graph__free(ip_cont);
@@ -649,8 +663,8 @@ static int graph_delete_client(struct ip_container *ip_cont, struct client *clie
 
 int network_graph_init(struct mosquitto_db *db) {
     if (db->config->graph_interval == 0) {
-		return 0;
-	}
+        return 0;
+    }
     ttl_cnt = db->config->graph_del_mult;
 
     graph = (struct network_graph *)graph__malloc(sizeof(struct network_graph));
@@ -699,7 +713,7 @@ int network_graph_cleanup(void) {
             }
             ip_temp = ip_curr;
             ip_curr = ip_curr->next;
-            graph__free(ip_temp->address);
+            graph__free(ip_temp->id);
             graph__free(ip_temp->client_dict->client_list);
             graph__free(ip_temp->client_dict);
             graph__free(ip_temp);
@@ -918,8 +932,7 @@ int network_graph_latency_start(struct mosquitto *context, const char *topic) {
         return -1;
     }
 
-    client->latency = mosquitto_time_ns();
-    client->latency_ready = true;
+    client->time_prev = mosquitto_time_ns();
 
     return 0;
 }
@@ -932,7 +945,6 @@ int network_graph_latency_end(struct mosquitto *context) {
     struct ip_container *ip_cont;
     struct client *client;
     cJSON *data;
-    double latency_avg_ns; // average latency in ns
 
     address = context->address;
 #ifdef WITH_BROKER
@@ -952,14 +964,10 @@ int network_graph_latency_end(struct mosquitto *context) {
         return -1;
     }
 
-    if (client->latency_ready) {
-        client->latency = (mosquitto_time_ns() - client->latency);
-        client->latency_total += client->latency;
-        ++client->latency_cnt;
-
-        latency_avg_ns = (double)client->latency_total / client->latency_cnt;
-        client->latency_avg_ms = round3(latency_avg_ns / 1000); // ms
-        client->latency_ready = false;
+    if (client->time_prev > 0) {
+        client->latency = (double)(mosquitto_time_ns() - client->time_prev);
+        client->latency = round3(client->latency / 1000); // ms
+        client->time_prev = -1;
 
         graph->changed = true;
     }
@@ -1019,14 +1027,14 @@ static cJSON *graph_json_create() {
 static cJSON *graph_json_add_ip(cJSON *root, struct ip_container *ip) {
     /*
     {
-        "address": "127.0.0.1",
+        "id": "<random id>",
         "clients": []
     }
     */
     cJSON *ip_json, *ips;
     ips = cJSON_GetObjectItem(root, "ips");
     ip_json = cJSON_CreateObject();
-    cJSON_AddStringToObject(ip_json, "address", ip->address);
+    cJSON_AddStringToObject(ip_json, "id", ip->id);
     cJSON_AddItemToObject(ip_json, "clients", cJSON_CreateArray());
     cJSON_AddItemToArray(ips, ip_json);
     return ip_json;
@@ -1047,7 +1055,7 @@ static cJSON *ip_json_add_client(cJSON *ip_json, struct client *client) {
     clients = cJSON_GetObjectItem(ip_json, "clients");
     client_json = cJSON_CreateObject();
     cJSON_AddStringToObject(client_json, "name", client->name);
-    cJSON_AddNumberToObject(client_json, "latency", client->latency_avg_ms);
+    cJSON_AddNumberToObject(client_json, "latency", client->latency);
     cJSON_AddItemToObject(client_json, "published", cJSON_CreateArray());
     cJSON_AddItemToArray(clients, client_json);
     return client_json;
