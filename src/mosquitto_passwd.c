@@ -16,6 +16,7 @@ Contributors:
 
 #include "config.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <openssl/opensslv.h>
 #include <openssl/evp.h>
@@ -519,6 +520,8 @@ int main(int argc, char *argv[])
 	int rc;
 	bool do_update_file = false;
 	char *backup_file;
+	int i;
+	size_t slen;
 
 	signal(SIGINT, handle_sigint);
 	signal(SIGTERM, handle_sigint);
@@ -589,9 +592,22 @@ int main(int argc, char *argv[])
 		print_usage();
 		return 1;
 	}
-	if(username && strlen(username) > 65535){
-		fprintf(stderr, "Error: Username must be less than 65536 characters long.\n");
-		return 1;
+	if(username){
+		slen = strlen(username);
+		if(slen > 65535){
+			fprintf(stderr, "Error: Username must be less than 65536 characters long.\n");
+			return 1;
+		}
+		for(i=0; i<slen; i++){
+			if(iscntrl(username[i])){
+				fprintf(stderr, "Error: Username must not contain control characters.\n");
+				return 1;
+			}
+		}
+		if(strchr(username, ':')){
+			fprintf(stderr, "Error: Username must not contain the ':' character.\n");
+			return 1;
+		}
 	}
 	if(password_cmd && strlen(password_cmd) > 65535){
 		fprintf(stderr, "Error: Password must be less than 65536 characters long.\n");

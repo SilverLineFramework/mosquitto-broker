@@ -135,6 +135,16 @@ void context__cleanup(struct mosquitto_db *db, struct mosquitto *context, bool d
 			mosquitto__free(context->bridge->remote_password);
 		}
 		context->bridge->remote_password = NULL;
+#ifdef WITH_TLS
+		if(context->ssl){
+			SSL_free(context->ssl);
+			context->ssl = NULL;
+		}
+		if(context->ssl_ctx){
+			SSL_CTX_free(context->ssl_ctx);
+			context->ssl_ctx = NULL;
+		}
+#endif
 	}
 #endif
 

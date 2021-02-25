@@ -86,7 +86,7 @@ static void net__print_error(int log, const char *format_str)
 
 #ifdef WIN32
 	FormatMessage(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM,
-			NULL, WSAGetLastError(), LANG_NEUTRAL, &buf, 0, NULL);
+			NULL, WSAGetLastError(), LANG_NEUTRAL, (LPTSTR)&buf, 0, NULL);
 
 	log__printf(NULL, log, format_str, buf);
 	LocalFree(buf);
@@ -165,7 +165,11 @@ int net__socket_accept(struct mosquitto_db *db, mosq_sock_t listensock)
 
 	if(db->config->set_tcp_nodelay){
 		int flag = 1;
+#ifdef WIN32
+			if (setsockopt(new_sock, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(int)) != 0) {
+#else
 		if(setsockopt(new_sock, IPPROTO_TCP, TCP_NODELAY, &flag, sizeof(int)) != 0){
+#endif
 			log__printf(NULL, MOSQ_LOG_WARNING, "Warning: Unable to set TCP_NODELAY.");
 		}
 	}
@@ -364,6 +368,9 @@ int net__tls_server_ctx(struct mosquitto__listener *listener)
 #if OPENSSL_VERSION_NUMBER >= 0x10002000L && OPENSSL_VERSION_NUMBER < 0x10100000L
 	SSL_CTX_set_ecdh_auto(listener->ssl_ctx, 1);
 #endif
+#endif
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+	SSL_CTX_set_dh_auto(listener->ssl_ctx, 1);
 #endif
 
 #ifdef SSL_OP_NO_RENEGOTIATION
@@ -588,11 +595,7 @@ int net__socket_listen(struct mosquitto__listener *listener)
 	struct addrinfo *ainfo, *rp;
 	char service[10];
 	int rc;
-#ifndef WIN32
 	int ss_opt = 1;
-#else
-	char ss_opt = 1;
-#endif
 #ifdef SO_BINDTODEVICE
 	struct ifreq ifr;
 #endif
