@@ -158,7 +158,7 @@ static struct ip_container *create_ip_container(const char *ip_addr) {
 static struct client *create_client(const char *id, const char *address) {
     struct client *client = (struct client *)graph__malloc(sizeof(struct client));
     if (!client) return NULL;
-    client->latency = -1.0;
+    client->latency = NAN;
     client->time_prev = -1;
     client->name = graph__strdup(id);
     client->pub_list = NULL;

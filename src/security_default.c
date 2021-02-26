@@ -1025,6 +1025,10 @@ int mosquitto_security_apply_default(struct mosquitto_db *db)
 #endif
 
 	HASH_ITER(hh_id, db->contexts_by_id, context, ctxt_tmp){
+		if(context->bridge){
+			continue;
+		}
+
 		/* Check for anonymous clients when allow_anonymous is false */
 		if(db->config->per_listener_settings){
 			if(context->listener){

@@ -306,7 +306,10 @@ static int callback_mqtt(struct libwebsocket_context *context,
 				}
 				count = libwebsocket_write(wsi, &packet->payload[packet->pos], txlen, LWS_WRITE_BINARY);
 				if(count < 0){
-					if (mosq->state == mosq_cs_disconnect_ws || mosq->state == mosq_cs_disconnecting){
+					if (mosq->state == mosq_cs_disconnect_ws
+							|| mosq->state == mosq_cs_disconnecting
+							|| mosq->state == mosq_cs_disused){
+
 						return -1;
 					}
 					return 0;
@@ -317,7 +320,10 @@ static int callback_mqtt(struct libwebsocket_context *context,
 				packet->to_process -= count;
 				packet->pos += count;
 				if(packet->to_process > 0){
-					if (mosq->state == mosq_cs_disconnect_ws || mosq->state == mosq_cs_disconnecting){
+					if (mosq->state == mosq_cs_disconnect_ws
+							|| mosq->state == mosq_cs_disconnecting
+							|| mosq->state == mosq_cs_disused){
+
 						return -1;
 					}
 					break;
@@ -344,7 +350,10 @@ static int callback_mqtt(struct libwebsocket_context *context,
 
 				mosq->next_msg_out = mosquitto_time() + mosq->keepalive;
 			}
-			if (mosq->state == mosq_cs_disconnect_ws || mosq->state == mosq_cs_disconnecting){
+			if (mosq->state == mosq_cs_disconnect_ws
+					|| mosq->state == mosq_cs_disconnecting
+					|| mosq->state == mosq_cs_disused){
+
 				return -1;
 			}
 			if(mosq->current_out_packet){

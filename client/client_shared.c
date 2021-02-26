@@ -77,6 +77,10 @@ static int check_format(const char *str)
 					// JSON output, assuming JSON payload
 				}else if(str[i+1] == 'U'){
 					// Unix time+nanoseconds
+#ifdef WIN32
+					fprintf(stderr, "Error: The %%U format option is not supported on Windows.\n");
+					return 1;
+#endif
 				}else if(str[i+1] == 'x' || str[i+1] == 'X'){
 					// payload in hex
 				}else{
@@ -295,7 +299,7 @@ int client_config_load(struct mosq_config *cfg, int pub_or_sub, int argc, char *
 				 * program name as the first entry. */
 				args[1] = strtok(line, " ");
 				if(args[1]){
-					args[2] = strtok(NULL, " ");
+					args[2] = strtok(NULL, "");
 					if(args[2]){
 						count = 3;
 					}else{

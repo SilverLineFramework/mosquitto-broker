@@ -731,6 +731,9 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 	if(!context) {
 		return;
 	}
+	if(context->sock == INVALID_SOCKET){
+		return;
+	}
 	for (i=0;i<1;i++) {
 #else
 	HASH_ITER(hh_sock, db->contexts_by_sock, context, ctxt_tmp){
@@ -738,6 +741,9 @@ static void loop_handle_reads_writes(struct mosquitto_db *db, struct pollfd *pol
 			continue;
 		}
 
+		if(pollfds[context->pollfd_index].fd == INVALID_SOCKET){
+			continue;
+		}
 		assert(pollfds[context->pollfd_index].fd == context->sock);
 #endif
 

@@ -38,7 +38,7 @@ static unsigned long max_queued_bytes = 0;
  * @param qos qos for the packet of interest
  * @return true if more in flight are allowed.
  */
-static bool db__ready_for_flight(struct mosquitto_msg_data *msgs, int qos)
+bool db__ready_for_flight(struct mosquitto_msg_data *msgs, int qos)
 {
 	bool valid_bytes;
 	bool valid_count;
@@ -69,7 +69,7 @@ static bool db__ready_for_flight(struct mosquitto_msg_data *msgs, int qos)
  * @param qos destination qos for the packet of interest
  * @return true if queuing is allowed, false if should be dropped
  */
-static bool db__ready_for_queue(struct mosquitto *context, int qos, struct mosquitto_msg_data *msg_data)
+bool db__ready_for_queue(struct mosquitto *context, int qos, struct mosquitto_msg_data *msg_data)
 {
 	int source_count;
 	int adjust_count;
@@ -340,6 +340,9 @@ int db__message_delete_outgoing(struct mosquitto_db *db, struct mosquitto *conte
 		}
 		db__message_dequeue_first(context, &context->msgs_out);
 	}
+#ifdef WITH_PERSISTENCE
+	db->persistence_changes++;
+#endif
 
 	return MOSQ_ERR_SUCCESS;
 }
@@ -394,6 +397,10 @@ int db__message_insert(struct mosquitto_db *db, struct mosquitto *context, uint1
 					return 2;
 				}
 			}
+		}
+		if(context->bridge && context->bridge->clean_start == true){
+			mosquitto_property_free_all(&properties);
+			return 2;
 		}
 	}
 
