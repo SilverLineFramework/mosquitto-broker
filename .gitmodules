@@ -1,0 +1,12 @@
+[submodule "libwebsockets"]
+	path = libwebsockets
+	url = https://github.com/warmcat/libwebsockets.git
+[submodule "src/cJSON"]
+	path = src/cJSON
+	url = https://github.com/DaveGamble/cJSON.git
+[submodule "jwt-auth"]
+	path = jwt-auth
+	url = https://github.com/wiomoc/mosquitto-jwt-auth
+[submodule "mosquitto-jwt-auth"]
+	path = mosquitto-jwt-auth
+	url = https://github.com/wiomoc/mosquitto-jwt-auth
