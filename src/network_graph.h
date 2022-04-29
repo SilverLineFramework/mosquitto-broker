@@ -213,9 +213,8 @@ int network_graph_latency_end(struct mosquitto *context);
  * @brief Function to periodically generate and publish JSON that represents the network
  *        graph. Called every interval seconds.
  *
- * @param[in]   db          mosquitto database structure.
  * @param[in]   interval    interval for periodic network graph publishing.
  */
-void network_graph_update(struct mosquitto_db *db, int interval);
+void network_graph_update(int interval);
 
 #endif

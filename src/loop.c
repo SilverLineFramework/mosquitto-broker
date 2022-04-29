@@ -199,7 +199,7 @@ int mosquitto_main_loop(struct mosquitto__listener_sock *listensock, int listens
 
 #ifdef WITH_GRAPH
 		if(db.config->graph_interval > 0){
-			network_graph_update(&db, db.config->graph_interval);
+			network_graph_update(db.config->graph_interval);
 		}
 #endif
 

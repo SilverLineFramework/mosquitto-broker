@@ -1119,7 +1119,7 @@ static void topic_json_add_sub(cJSON *topic, struct sub_edge *sub_edge, double b
 /*
  * Called every graph->interval seconds
  */
-void network_graph_update(struct mosquitto_db *db, int interval) {
+void network_graph_update(int interval) {
     static time_t last_update = 0;
     static unsigned long current_heap = -1;
     static unsigned long max_heap = -1;
@@ -1211,7 +1211,7 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
         // publish the updated graph to $NETWORK topic
         json_buf = cJSON_PrintUnformatted(root);
         if (json_buf != NULL && graph->changed) {
-            db__messages_easy_queue(db, NULL, "$NETWORK", GRAPH_QOS, strlen(json_buf), json_buf, 1, 0, NULL);
+            db__messages_easy_queue(NULL, "$NETWORK", GRAPH_QOS, strlen(json_buf), json_buf, 1, 0, NULL);
             graph->changed = false;
         }
         cJSON_free(json_buf);
@@ -1221,14 +1221,14 @@ void network_graph_update(struct mosquitto_db *db, int interval) {
         if (current_heap != memcount) {
             current_heap = memcount;
             snprintf(heap_buf, BUFLEN, "%lu", current_heap);
-            db__messages_easy_queue(db, NULL, "$NETWORK/heap/current", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
+            db__messages_easy_queue(NULL, "$NETWORK/heap/current", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
         }
 
         // update current graph maximum memory usage topic
         if (max_heap != memcount) {
             max_heap = max_memcount;
             snprintf(heap_buf, BUFLEN, "%lu", max_heap);
-            db__messages_easy_queue(db, NULL, "$NETWORK/heap/maximum", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
+            db__messages_easy_queue(NULL, "$NETWORK/heap/maximum", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
         }
 
         last_update = mosquitto_time();
