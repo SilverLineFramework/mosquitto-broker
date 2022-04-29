@@ -32,6 +32,7 @@ Contributors:
 #include "send_mosq.h"
 #include "sys_tree.h"
 #include "util_mosq.h"
+#include "network_graph.h"
 
 
 int handle__publish(struct mosquitto *context)
@@ -258,6 +259,9 @@ int handle__publish(struct mosquitto *context)
 	}
 
 	log__printf(NULL, MOSQ_LOG_DEBUG, "Received PUBLISH from %s (d%d, q%d, r%d, m%d, '%s', ... (%ld bytes))", context->id, dup, msg->qos, msg->retain, msg->source_mid, msg->topic, (long)msg->payloadlen);
+#ifdef WITH_GRAPH
+	network_graph_add_topic(context, retain, topic, payloadlen);
+#endif
 
 	if(!strncmp(msg->topic, "$CONTROL/", 9)){
 #ifdef WITH_CONTROL
@@ -353,6 +357,9 @@ int handle__publish(struct mosquitto *context)
 			}else if(res == 1){
 				rc = 1;
 			}
+#ifdef WITH_GRAPH
+			network_graph_latency_start(context, topic);
+#endif
 			break;
 	}
 

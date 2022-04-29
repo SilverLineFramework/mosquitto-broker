@@ -63,6 +63,9 @@ set (MOSQ_SRCS
 	../lib/strings_mosq.c
 	subs.c
 	sys_tree.c sys_tree.h
+	network_graph.c network_graph.h
+	cJSON/cJSON.c cJSON/cJSON.h
+	cJSON/cJSON_Utils.c cJSON/cJSON_Utils.h
 	../lib/time_mosq.c
 	../lib/tls_mosq.c
 	topic_tok.c
@@ -118,6 +121,12 @@ option(WITH_SYS_TREE
 if (WITH_SYS_TREE)
 	add_definitions("-DWITH_SYS_TREE")
 endif (WITH_SYS_TREE)
+
+option(WITH_GRAPH
+	"Include $NETWORK graph support?" ON)
+if (WITH_GRAPH)
+	add_definitions("-DWITH_GRAPH")
+endif (WITH_GRAPH)
 
 option(WITH_ADNS
 	"Include ADNS support?" OFF)

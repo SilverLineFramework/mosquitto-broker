@@ -204,6 +204,8 @@ static void config__init_reload(struct mosquitto__config *config)
 	config->set_tcp_nodelay = false;
 	config->sys_interval = 10;
 	config->upgrade_outgoing_qos = false;
+	config->graph_interval = 30;
+	config->graph_del_mult = 2;
 
 	config__cleanup_plugins(config);
 }
@@ -584,6 +586,8 @@ static void config__copy(struct mosquitto__config *src, struct mosquitto__config
 
 	dest->queue_qos0_messages = src->queue_qos0_messages;
 	dest->sys_interval = src->sys_interval;
+	dest->graph_interval = src->graph_interval;
+	dest->graph_del_mult = src->graph_del_mult;
 	dest->upgrade_outgoing_qos = src->upgrade_outgoing_qos;
 
 #ifdef WITH_WEBSOCKETS
@@ -1979,6 +1983,19 @@ static int config__read_file_core(struct mosquitto__config *config, bool reload,
 					if(conf__parse_int(&token, "sys_interval", &config->sys_interval, saveptr)) return MOSQ_ERR_INVAL;
 					if(config->sys_interval < 0 || config->sys_interval > 65535){
 						log__printf(NULL, MOSQ_LOG_ERR, "Error: Invalid sys_interval value (%d).", config->sys_interval);
+						return MOSQ_ERR_INVAL;
+					}
+				}else if(!strcmp(token, "graph_interval")){
+					if(conf__parse_int(&token, "graph_interval", &config->graph_interval, saveptr)) return MOSQ_ERR_INVAL;
+					if(config->graph_interval < 0 || config->graph_interval > 65535){
+						log__printf(NULL, MOSQ_LOG_ERR, "Error: Invalid graph_interval value (%d).", config->graph_interval);
+						return MOSQ_ERR_INVAL;
+					}
+				}
+				else if(!strcmp(token, "graph_del_mult")){
+					if(conf__parse_int(&token, "graph_del_mult", &config->graph_del_mult, saveptr)) return MOSQ_ERR_INVAL;
+					if(config->graph_del_mult < 0 || config->graph_del_mult > 65535){
+						log__printf(NULL, MOSQ_LOG_ERR, "Error: Invalid graph_del_mult value (%d).", config->graph_interval);
 						return MOSQ_ERR_INVAL;
 					}
 				}else if(!strcmp(token, "threshold")){

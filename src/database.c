@@ -28,6 +28,7 @@ Contributors:
 #include "sys_tree.h"
 #include "time_mosq.h"
 #include "util_mosq.h"
+#include "network_graph.h"
 
 /**
  * Is this context ready to take more in flight messages right now?
@@ -1062,6 +1063,9 @@ static int db__message_write_inflight_out_single(struct mosquitto *context, stru
 			rc = send__publish(context, mid, topic, payloadlen, payload, qos, retain, retries, cmsg_props, store_props, expiry_interval);
 			if(rc == MOSQ_ERR_SUCCESS || rc == MOSQ_ERR_OVERSIZE_PACKET){
 				db__message_remove(&context->msgs_out, msg);
+#ifdef WITH_GRAPH
+				network_graph_add_sub_edge(context, topic);
+#endif
 			}else{
 				return rc;
 			}
@@ -1073,6 +1077,9 @@ static int db__message_write_inflight_out_single(struct mosquitto *context, stru
 				msg->timestamp = db.now_s;
 				msg->dup = 1; /* Any retry attempts are a duplicate. */
 				msg->state = mosq_ms_wait_for_puback;
+#ifdef WITH_GRAPH
+				network_graph_add_sub_edge(context, topic);
+#endif
 			}else if(rc == MOSQ_ERR_OVERSIZE_PACKET){
 				db__message_remove(&context->msgs_out, msg);
 			}else{
@@ -1086,6 +1093,9 @@ static int db__message_write_inflight_out_single(struct mosquitto *context, stru
 				msg->timestamp = db.now_s;
 				msg->dup = 1; /* Any retry attempts are a duplicate. */
 				msg->state = mosq_ms_wait_for_pubrec;
+#ifdef WITH_GRAPH
+				network_graph_add_sub_edge(context, topic);
+#endif
 			}else if(rc == MOSQ_ERR_OVERSIZE_PACKET){
 				db__message_remove(&context->msgs_out, msg);
 			}else{

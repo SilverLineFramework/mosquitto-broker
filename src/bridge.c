@@ -51,6 +51,7 @@ Contributors:
 #include "tls_mosq.h"
 #include "util_mosq.h"
 #include "will_mosq.h"
+#include "network_graph.h"
 
 #ifdef WITH_BRIDGE
 
@@ -315,6 +316,10 @@ int bridge__connect_step3(struct mosquitto *context)
 	if(context->bridge->round_robin == false && context->bridge->cur_address != 0){
 		context->bridge->primary_retry = db.now_s + 5;
 	}
+
+#ifdef WITH_GRAPH
+	network_graph_add_client(context);
+#endif
 
 	rc = send__connect(context, context->keepalive, context->clean_start, NULL);
 	if(rc == MOSQ_ERR_SUCCESS){

@@ -26,6 +26,7 @@ Contributors:
 #include "mqtt_protocol.h"
 #include "packet_mosq.h"
 #include "send_mosq.h"
+#include "network_graph.h"
 
 int handle__unsubscribe(struct mosquitto *context)
 {
@@ -135,6 +136,9 @@ int handle__unsubscribe(struct mosquitto *context)
 		}
 		log__printf(NULL, MOSQ_LOG_UNSUBSCRIBE, "%s %s", context->id, sub);
 		mosquitto__free(sub);
+#ifdef WITH_GRAPH
+		network_graph_delete_sub_edge(context, sub);
+#endif
 		if(rc){
 			mosquitto__free(reason_codes);
 			return rc;

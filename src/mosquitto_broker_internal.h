@@ -293,6 +293,8 @@ struct mosquitto__config {
 	bool retain_available;
 	bool set_tcp_nodelay;
 	int sys_interval;
+	int graph_interval;
+	int graph_del_mult;
 	bool upgrade_outgoing_qos;
 	char *user;
 #ifdef WITH_WEBSOCKETS

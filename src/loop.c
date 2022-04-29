@@ -54,6 +54,7 @@ Contributors:
 #include "sys_tree.h"
 #include "time_mosq.h"
 #include "util_mosq.h"
+#include "network_graph.h"
 
 extern bool flag_reload;
 #ifdef WITH_PERSISTENCE
@@ -196,6 +197,12 @@ int mosquitto_main_loop(struct mosquitto__listener_sock *listensock, int listens
 		}
 #endif
 
+#ifdef WITH_GRAPH
+		if(db->config->graph_interval > 0){
+			network_graph_update(db, db->config->graph_interval);
+		}
+#endif
+
 		keepalive__check();
 
 #ifdef WITH_BRIDGE
@@ -316,6 +323,9 @@ void do_disconnect(struct mosquitto *context, int reason)
 		if(db.config->connection_messages == true){
 			if(context->id){
 				id = context->id;
+#ifdef WITH_GRAPH
+				network_graph_delete_client(context);
+#endif
 			}else{
 				id = "<unknown>";
 			}

@@ -26,6 +26,7 @@ Contributors:
 #include "mqtt_protocol.h"
 #include "packet_mosq.h"
 #include "property_mosq.h"
+#include "network_graph.h"
 
 
 
@@ -208,6 +209,9 @@ int handle__subscribe(struct mosquitto *context)
 				log__printf(NULL, MOSQ_LOG_SUBSCRIBE, "%s %d %s", context->id, qos, sub);
 			}
 			mosquitto__free(sub);
+#ifdef WITH_GRAPH
+			network_graph_add_sub_edge(context, sub);
+#endif
 
 			tmp_payload = mosquitto__realloc(payload, payloadlen + 1);
 			if(tmp_payload){

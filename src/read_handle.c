@@ -30,6 +30,7 @@ Contributors:
 #include "send_mosq.h"
 #include "sys_tree.h"
 #include "util_mosq.h"
+#include "network_graph.h"
 
 
 int handle__packet(struct mosquitto *context)
@@ -59,6 +60,9 @@ int handle__packet(struct mosquitto *context)
 			break;
 		case CMD_PUBREL:
 			rc = handle__pubrel(context);
+#ifdef WITH_GRAPH
+			network_graph_latency_end(context);
+#endif
 			break;
 		case CMD_CONNECT:
 			return handle__connect(context);

@@ -55,6 +55,7 @@ Contributors:
 #include "memory_mosq.h"
 #include "misc_mosq.h"
 #include "util_mosq.h"
+#include "network_graph.h"
 
 struct mosquitto_db db;
 
@@ -542,6 +543,11 @@ int main(int argc, char *argv[])
 	sys_tree__init();
 #endif
 
+#ifdef WITH_GRAPH
+	rc = network_graph_init(&int_db);
+	if(rc) return rc;
+#endif
+
 	if(listeners__start()) return 1;
 
 	rc = mux__init(listensock, listensock_count);
@@ -610,6 +616,10 @@ int main(int argc, char *argv[])
 	log__close(&config);
 	config__cleanup(db.config);
 	net__broker_cleanup();
+
+#ifdef WITH_GRAPH
+	network_graph_cleanup();
+#endif
 
 	return rc;
 }
