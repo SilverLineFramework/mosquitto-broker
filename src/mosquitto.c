@@ -544,7 +544,7 @@ int main(int argc, char *argv[])
 #endif
 
 #ifdef WITH_GRAPH
-	rc = network_graph_init(&int_db);
+	rc = network_graph_init(&db);
 	if(rc) return rc;
 #endif
 

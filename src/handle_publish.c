@@ -260,7 +260,7 @@ int handle__publish(struct mosquitto *context)
 
 	log__printf(NULL, MOSQ_LOG_DEBUG, "Received PUBLISH from %s (d%d, q%d, r%d, m%d, '%s', ... (%ld bytes))", context->id, dup, msg->qos, msg->retain, msg->source_mid, msg->topic, (long)msg->payloadlen);
 #ifdef WITH_GRAPH
-	network_graph_add_topic(context, retain, topic, payloadlen);
+	network_graph_add_topic(context, msg->retain, msg->topic, msg->payloadlen);
 #endif
 
 	if(!strncmp(msg->topic, "$CONTROL/", 9)){
@@ -358,7 +358,7 @@ int handle__publish(struct mosquitto *context)
 				rc = 1;
 			}
 #ifdef WITH_GRAPH
-			network_graph_latency_start(context, topic);
+			network_graph_latency_start(context, stored->topic);
 #endif
 			break;
 	}

@@ -932,7 +932,7 @@ int network_graph_latency_start(struct mosquitto *context, const char *topic) {
         return -1;
     }
 
-    client->time_prev = mosquitto_time_ns();
+    client->time_prev = mosquitto_time();
 
     return 0;
 }
@@ -965,7 +965,7 @@ int network_graph_latency_end(struct mosquitto *context) {
     }
 
     if (client->time_prev > 0) {
-        client->latency = (double)(mosquitto_time_ns() - client->time_prev);
+        client->latency = (double)(mosquitto_time() - client->time_prev);
         client->latency = round3(client->latency / 1000); // ms
         client->time_prev = -1;
 
