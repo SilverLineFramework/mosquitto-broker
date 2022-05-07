@@ -21,41 +21,23 @@ RUN truncate -s0 /tmp/preseed.cfg; \
         curl \
         netcat \
         ca-certificates \
-        vim && \
-    wget https://github.com/warmcat/libwebsockets/archive/v${LWS_VERSION}.tar.gz -O /tmp/lws.tar.gz && \
-    mkdir -p /build/lws && \
-    tar --strip=1 -xf /tmp/lws.tar.gz -C /build/lws && \
-    rm /tmp/lws.tar.gz && \
-    cd /build/lws && \
-    cmake . \
-        -DCMAKE_BUILD_TYPE=MinSizeRel \
-        -DCMAKE_INSTALL_PREFIX=/usr \
-        -DLWS_IPV6=ON \
-        -DLWS_WITHOUT_BUILTIN_GETIFADDRS=ON \
-        -DLWS_WITHOUT_CLIENT=ON \
-        -DLWS_WITHOUT_EXTENSIONS=ON \
-        -DLWS_WITHOUT_TESTAPPS=ON \
-        -DLWS_WITH_SHARED=OFF \
-        -DLWS_WITH_ZIP_FOPS=OFF \
-        -DLWS_WITH_ZLIB=OFF && \
-    make -j "$(nproc)" && \
-    rm -rf /root/.cmake && \
-    mkdir -p /build/mosq
+        vim
+
+RUN mkdir -p /build/mosq
 
 WORKDIR /build/mosq
 
 COPY . .
 
+RUN chmod +x setup.sh && ./setup.sh
+
 # Build /usr/lib/libmosquitto_jwt_auth.so
 ENV PATH="/root/.cargo/bin:${PATH}"
 RUN curl https://sh.rustup.rs -sSf | bash -s -- -y && \
-    cd /build/mosq/jwt-auth && \
+    cd /build/mosq/mosquitto-jwt-auth && \
     cargo build --release && \
     mkdir -p /mosquitto/jwt-auth && \
     install -s -m644 target/release/libmosquitto_jwt_auth.so /usr/lib/libmosquitto_jwt_auth.so
-
-RUN mkdir -p /mosquitto/www && \
-    cp -r /build/mosq/graph_viewer/html/ /mosquitto/www/
 
 RUN rm -rf build || true && \
     mkdir build && \
@@ -72,12 +54,11 @@ RUN rm -rf build || true && \
     mkdir -p /mosquitto/config /mosquitto/data /mosquitto/log && \
     install -d /usr/sbin/ && \
     install -s -m755 /build/mosq/bin/mosquitto_pub /usr/bin/mosquitto_pub && \
-    install -s -m755 /build/mosq/bin//mosquitto_rr /usr/bin/mosquitto_rr && \
+    install -s -m755 /build/mosq/bin/mosquitto_rr /usr/bin/mosquitto_rr && \
     install -s -m755 /build/mosq/bin/mosquitto_sub /usr/bin/mosquitto_sub && \
     install -s -m644 /build/mosq/build/lib/libmosquitto.so.1 /usr/lib/libmosquitto.so.1 && \
     install -s -m755 /build/mosq/bin/mosquitto /usr/sbin/mosquitto && \
-    install -s -m755 /build/mosq/bin/mosquitto_passwd /usr/bin/mosquitto_passwd && \
-    install -m644 /build/mosq/conf/mosquitto.conf /mosquitto/config/mosquitto.conf && \
+    install -m644 /build/mosq/mosquitto.conf /mosquitto/config/mosquitto.conf && \
     chown -R mosquitto:mosquitto /mosquitto && \
     rm -rf /build
 
