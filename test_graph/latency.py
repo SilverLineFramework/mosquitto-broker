@@ -2,7 +2,7 @@ import paho.mqtt.client as mqtt
 import time
 
 broker = "arena0.andrew.cmu.edu"
-port = 21883
+port = 29001
 
 client1 = mqtt.Client("client_py1", clean_session=True, userdata=None, transport="websockets")
 

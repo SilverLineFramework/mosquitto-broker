@@ -63,6 +63,33 @@ static char *create_random_id(void) {
     return id;
 }
 
+time_t mosquitto_time_ns(void)
+{
+#ifdef WIN32
+    return GetTickCount64();
+#elif _POSIX_TIMERS>0 && defined(_POSIX_MONOTONIC_CLOCK)
+    struct timespec tp;
+
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+    return tp.tv_sec * 1000000 + tp.tv_nsec / 1000;
+#elif defined(__APPLE__)
+    static mach_timebase_info_data_t tb;
+    uint64_t ticks;
+    uint64_t nanos;
+
+    ticks = mach_absolute_time();
+
+    if(tb.denom == 0){
+            mach_timebase_info(&tb);
+        }
+    nanos = ticks*tb.numer/tb.denom/1000;
+
+    return (time_t)nanos;
+#else
+    return time(NULL);
+#endif
+}
+
 /*
  * Malloc wrapper for counting graph memory usage
  */
@@ -932,7 +959,7 @@ int network_graph_latency_start(struct mosquitto *context, const char *topic) {
         return -1;
     }
 
-    client->time_prev = mosquitto_time();
+    client->time_prev = mosquitto_time_ns();
 
     return 0;
 }
@@ -965,7 +992,7 @@ int network_graph_latency_end(struct mosquitto *context) {
     }
 
     if (client->time_prev > 0) {
-        client->latency = (double)(mosquitto_time() - client->time_prev);
+        client->latency = (double)(mosquitto_time_ns() - client->time_prev);
         client->latency = round3(client->latency / 1000); // ms
         client->time_prev = -1;
 
@@ -1124,7 +1151,7 @@ void network_graph_update(int interval) {
     static unsigned long current_heap = -1;
     static unsigned long max_heap = -1;
 
-    time_t now = mosquitto_time();
+    time_t now = mosquitto_time_ns();
 
     char *json_buf, heap_buf[BUFLEN];
     cJSON *root, *ip_json, *client_json, *topic_json;
@@ -1231,6 +1258,6 @@ void network_graph_update(int interval) {
             db__messages_easy_queue(NULL, "$NETWORK/heap/maximum", GRAPH_QOS, strlen(heap_buf), heap_buf, 1, 60, NULL);
         }
 
-        last_update = mosquitto_time();
+        last_update = mosquitto_time_ns();
     }
 }
