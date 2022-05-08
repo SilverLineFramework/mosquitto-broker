@@ -72,11 +72,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }]
     });
 
-    let brokerAddr = `ws://${ip_main}:${port}/`;
-    if (oz) {
-        brokerAddr = "wss://oz.andrew.cmu.edu/mqtt/";
-    }
-    const clientMain = new Paho.MQTT.Client(brokerAddr, "graphViewer-" + (+new Date).toString(36));
+    const clientMain = new Paho.MQTT.Client(ip_main, port, "graphViewer-" + (+new Date).toString(36));
     const graphTopic = "$NETWORK";
 
     let prevJSON = [];
