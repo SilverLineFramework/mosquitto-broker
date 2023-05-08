@@ -30,10 +30,14 @@ Contributors:
 #include "util_mosq.h"
 #include "network_graph.h"
 
+#include "time_log.h"
+
 int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 {
 	int rc;
 	if(!context) return MOSQ_ERR_INVAL;
+
+	TIME_LOG_DECLARE();
 
 	switch((context->in_packet.command)&0xF0){
 		case CMD_PINGREQ:
@@ -49,7 +53,9 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 			rc = handle__pubackcomp(db, context, "PUBCOMP");
 			break;
 		case CMD_PUBLISH:
+			TIME_LOG_START();
 			rc = handle__publish(db, context);
+			TIME_LOG_END(handle__publish);
 			break;
 		case CMD_PUBREC:
 			rc = handle__pubrec(db, context);
@@ -61,13 +67,17 @@ int handle__packet(struct mosquitto_db *db, struct mosquitto *context)
 #endif
 			break;
 		case CMD_CONNECT:
+			TIME_LOG_START();
 			rc = handle__connect(db, context);
+			TIME_LOG_END(handle__connect);
 			break;
 		case CMD_DISCONNECT:
 			rc = handle__disconnect(db, context);
 			break;
 		case CMD_SUBSCRIBE:
+			TIME_LOG_START();
 			rc = handle__subscribe(db, context);
+			TIME_LOG_END(handle__subscribe);
 			break;
 		case CMD_UNSUBSCRIBE:
 			rc = handle__unsubscribe(db, context);

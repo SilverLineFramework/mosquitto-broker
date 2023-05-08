@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+
+CNAME=${1:-"conixcenter/arena-broker"}   
+
 docker login --username conixcenter
-docker build . -t conixcenter/arena-broker
-docker push conixcenter/arena-broker
+docker build . -t $CNAME
+docker push $CNAME
