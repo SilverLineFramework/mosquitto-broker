@@ -1,4 +1,4 @@
-FROM ubuntu:latest
+FROM ubuntu:20.04
 
 ENV LWS_VERSION=2.4.2
 
@@ -54,8 +54,8 @@ RUN curl https://sh.rustup.rs -sSf | bash -s -- -y && \
     mkdir -p /mosquitto/jwt-auth && \
     install -s -m644 target/release/libmosquitto_jwt_auth.so /usr/lib/libmosquitto_jwt_auth.so
 
-RUN mkdir -p /mosquitto/www && \
-    cp -r /build/mosq/graph_viewer/html/ /mosquitto/www/
+#RUN mkdir -p /mosquitto/www && \
+#    cp -r /build/mosq/graph_viewer/html/ /mosquitto/www/
 
 RUN rm -rf build || true && \
     mkdir build && \
